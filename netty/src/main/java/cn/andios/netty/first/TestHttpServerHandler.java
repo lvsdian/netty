@@ -19,7 +19,7 @@ import java.net.URI;
 public class TestHttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
 
     /**
-     * 读取客户端请求，并且返回响应
+     * channelRead0读取客户端请求，并且返回响应
      * @param ctx
      * @param msg
      * @throws Exception
@@ -27,8 +27,8 @@ public class TestHttpServerHandler extends SimpleChannelInboundHandler<HttpObjec
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, HttpObject msg) throws Exception {
 
-        System.out.println(msg.getClass());
-        System.out.println(ctx.channel().remoteAddress());
+        System.out.println("msg.getClass:" + msg.getClass());
+        System.out.println("remoteAddress:" + ctx.channel().remoteAddress());
 
         if(msg instanceof HttpRequest){
             System.out.println("执行channelRead0");
