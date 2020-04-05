@@ -14,6 +14,12 @@ import io.netty.handler.logging.LoggingHandler;
  * @when:2020/04/05/21:32
  */
 public class MyServer {
+    /**
+     * 启动MyServer，开启服务端，
+     * 可通过cn.andios.netty.third.MyChatClient客户端来测试读写检测机制
+     * @param args
+     * @throws InterruptedException
+     */
     public static void main(String[] args) throws InterruptedException {
         EventLoopGroup bossGroup = new NioEventLoopGroup();
         EventLoopGroup workerGroup = new NioEventLoopGroup();
