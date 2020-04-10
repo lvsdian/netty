@@ -1,3 +1,6 @@
+//command：protoc --java_out= src/main/java  src/protobuf/DataInfo.proto
+//格式：protoc --java_out = 【目的路径】  【源文件路径】
+
 syntax = "proto2";
 
 package cn.andios.protobuf;
