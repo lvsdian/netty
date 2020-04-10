@@ -34,6 +34,7 @@
 [官网](https://developers.google.com/protocol-buffers)
 [文档](https://developers.google.com/protocol-buffers/docs/javatutorial)
 [下载地址](https://github.com/protocolbuffers/protobuf/releases)    
+- 下载后配置环境变量，即可使用protoc命令，使用protoc运行.proto文件即可生成源代码文件
 - 对于同一个proto文件中可能会定义多个message，在传输时具体传输的message需要按需求变化，解决方案可以参考MyDataInfo.proto中定义的MyMessage，
 MyMessage中指定data_type，在传输时指定类型为MyMessage，实际传输的message根据MyMessage的data_type获取。示例可见cn.andios.netty.sixth
 - 对于MyDataInfo.proto生成的java文件，服务端和客户端都需要调用，如何让它们都可以调用?(假设项目基于git管理)
