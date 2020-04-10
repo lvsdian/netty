@@ -34,5 +34,15 @@
 [官网](https://developers.google.com/protocol-buffers)
 [文档](https://developers.google.com/protocol-buffers/docs/javatutorial)
 [下载地址](https://github.com/protocolbuffers/protobuf/releases)    
-    
+- 对于同一个proto文件中可能会定义多个message，在传输时具体传输的message需要按需求变化，解决方案可以参考MyDataInfo.proto中定义的MyMessage，
+MyMessage中指定data_type，在传输时指定类型为MyMessage，实际传输的message根据MyMessage的data_type获取。示例可见cn.andios.netty.sixth
+- 对于MyDataInfo.proto生成的java文件，服务端和客户端都需要调用，如何让它们都可以调用?(假设项目基于git管理)
+1. 利用`git submodule`(git外仓库的一个里层仓库)，假设把MyDataInfo.proto生成的java文件放到`ProtoBuf-Java`项目中，让服务端和客户端都引用这个项目。
+- 缺点：
+    1. 项目分支一般分为：develop、test、master，服务端、客户端、ProtoBuf-Java可能都有多个分支。服务端、客户端、ProtoBuf-Java等项目的分支都要一一对应，即
+    服务端develop分支对应ProtoBuf-Java项目develop分支，不能对应ProtoBuf-Java项目master分支。而在分支切换时，由于疏忽往往切换外层项目分支，没有切换里层项目分支
+    2. 比如客户端引入了ProtoBuf-Java项目，客户端中修改了ProtoBuf-Java项目文件，把结果推送到ProtoBuf-Java项目远程，此时git submodule也可能会产生一些问题
+2. 利用`git subtree`，将ProtoBuf-Java项目拉取到客户端或者服务端中，与`git submodule`不同的是，此时它们属于同一个项目，而不是两个仓库。此时就不存在外层仓库
+与里层仓库分支不一样的情况。
+3. 每次修改都把ProtoBuf-Java项目打成jar包放到私服里，方法可行，但每次修改都要改变版本号，修改pom.xml等文件，比较麻烦
     
