@@ -17,4 +17,5 @@ dependencies {
     compile group: 'io.netty', name: 'netty-all', version: '4.1.10.Final'
     compile group: 'com.google.protobuf', name:'protobuf-java', version: '3.11.0'
     compile group: 'com.google.protobuf', name:'protobuf-java-util', version:'3.11.0'
+    compile 'org.apache.thrift:libthrift:0.13.0'
 }

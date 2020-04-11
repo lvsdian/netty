@@ -47,3 +47,30 @@ MyMessage中指定data_type，在传输时指定类型为MyMessage，实际传�
 与里层仓库分支不一样的情况。
 3. 每次修改都把ProtoBuf-Java项目打成jar包放到私服里，方法可行，但每次修改都要改变版本号，修改pom.xml等文件，比较麻烦
     
+## Apache Thrift
+- [下载](https://mirror.bit.edu.cn/apache/thrift/)
+- 可伸缩的跨语言的服务开发，融合一个软件栈和代码生成引擎构建高效的服务。
+- Thrift是一个典型的CS结构，客户端和服务端可以使用不同的语言开发。既然客户端和服务端能使用不同的语言开发，就一定要有一种中间语言来关联客户端和服务端的语言。它
+就是IDL(Interface Description Language)
+- 实现多语言之间的通信
+    - 数据传输使用socket(多种语言均支持)，数据再以特定的个数(string等)发送，接收方语言进行解析
+- Thrift架构
+- ![](img/thrift.png)    
+- Thrift传输格式
+    - TBinaryProtocol：二进制格式
+    - TCompactProtocol：压缩格式
+    - TJSONProtocol：JSOn格式
+    - TSimpleJSONProtocol：提供JSON只写协议，生成的文件很容易通过脚本语言解析。这种协议缺少必要的元数据信息，解码时没有参照的标准，可以生成，但对端不能解析
+    - TDebugProtocol：使用易懂的可读的文本格式，以便于debug
+- Thrift数据传输方式
+    - TSocket：阻塞式socket
+    - TFramedTransport：以frame为单位进行传输，非阻塞式服务中使用
+    - TFileTransport：以文件形式进行传输
+    - TMemoryTransport：将内存用于IO，Java实现时内部实际使用了简单的ByteArrayOutStream
+    - TZlibTransport：使用zlib进行压缩，与其他传输方式联合使用，当前无java实现
+- Thrift支持的服务模型
+    - TSimpleServer：简单的单线程服务模型，常用于测试
+    - TThreadPoolServer：多线程服务模型，使用标准的阻塞式IO
+    - TNonblockingServer：多线程服务模型，使用非阻塞IO(需要使用TFrameTransport数据传输方式)
+    - THsHaServer：THsHa引入了线程池去处理，其模型把读写任务放到线程池去处理，Half-sync/Half-async的处理模型，Half-async是在处理IO事件上(accept/read/write io)，
+    Half-async使用handler对rpc的同步处理
