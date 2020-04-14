@@ -74,3 +74,49 @@ MyMessage中指定data_type，在传输时指定类型为MyMessage，实际传�
     - TNonblockingServer：多线程服务模型，使用非阻塞IO(需要使用TFrameTransport数据传输方式)
     - THsHaServer：THsHa引入了线程池去处理，其模型把读写任务放到线程池去处理，Half-sync/Half-async的处理模型，Half-async是在处理IO事件上(accept/read/write io)，
     Half-async使用handler对rpc的同步处理
+    
+## gRPC
+[官网](https://grpc.io/)
+- gRPC可以使用Protocol Buffers既作为IDL(Interface Description Language)又作为底层消息交换的格式
+- 在gRPC中一个客户端应用可以直接调用在不同机器上的服务端应用的方法，就像一个本地对象一样，这使得可以轻松的创建分布式应用和服务。就像很多RPC系统一样，gRPC基于定义
+一个服务，指定好可以远程调用的方法，同时带上参数和返回类型的这种想法。在服务器端，服务器会实现这个接口，运行一个服务器来处理客户端的调用；在客户端，提供与服务器相同的方法
+- ![](img/gRPC.png)  
+- gRPC客户端和服务端可以在各种各样的环境下运行并相互通信，比如可以使用Go、Python作为客户端，用Java作为服务端
+ ![](https://grpc.io/docs/guides/concepts/)
+### Service definition
+- 就像很多gRPC系统一样，就像很多RPC系统一样，gRPC基于定义一个服务，指定好可以远程调用的方法，同时带上参数和返回类型的这种想法。默认情况下gRPC会使用Protocol Buffers作为IDL,
+用于描述服务接口以及payload message的结构
+    ```proto
+        service HelloService {
+          rpc SayHello (HelloRequest) returns (HelloResponse);
+        }
+        
+        message HelloRequest {
+          string greeting = 1;
+        }
+        
+        message HelloResponse {
+          string reply = 1;
+        }
+    ```
+- gRPC可以让我们定义4种服务方法
+    - 一元RPC，客户端向服务端发送单个请求并获得单个响应，就像普通方法调用一样
+    ```
+        rpc SayHello(HelloRequest) returns (HelloResponse);
+    ```
+    - 服务器流式RPC，客户端向服务端发送请求，并获取流以读取会一系列消息，客户端从返回的流中读取，直到没有更多消息为止。gRPC保证单个RPC调用中的消息顺序
+    ```
+        rpc LotsOfReplies(HelloRequest) returns (stream HelloResponse);
+    ```
+    - 客户端流式RPC，客户端编写消息序列，然后再次使用提供的流将它们发送到服务器。客户端写完消息后，它将等待服务器读取消息并返回响应。gRPC保证单个RPC调用中的消息顺序。
+    ```
+        rpc LotsOfGreetings(stream HelloRequest) returns (HelloResponse);
+    ```
+    - 双向流式RPC，双方都使用读写流发送一系列消息。这两个流独立运行，因此客户端和服务器可以按照自己喜欢的顺序进行读写：例如，服务器可以在写响应之前等待
+    接受所有客户端消息，或者可以先读取消息在写入消息，或者其他一些读写组合。每个流中的消息顺序都会保留
+    ```
+        rpc BidiHello(stream HelloRequest) returns (stream HelloResponse);
+    ```
+### Using the API surface
+- 从一个.proto文件服务定义开始，gRPC提供protocol buffer编译器插件自动生成服务器端和客户端代码文件，gRPC用户通常会在客户端调用这些API，在服务器端实现相应的API.
+- 
