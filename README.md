@@ -48,19 +48,19 @@
 >
 > 一个buffer的`position`指下一个将被读或写的元素索引。一个buffer的`position`不会为负数并且不会大于`limit`
 
-- 比如创建一个大小为10的ByteBuffer对象，初始时position=0，limit和capacity为10
+- 比如创建一个大小为`10`的`ByteBuffer`对象，初始时`position=0`，`limit`和`capacity`为`10`
 
   ![](img/buffer_1.png)
 
-- 调用`put()`方法从通道中读4个字节数据到缓冲区后，position指向4，即下一个操作的字节索引为4
+- 调用`buffer.put()`方法或`channel.read()`方法向`buffer`输入4个字节数据后，`position`指向4，即下一个操作的字节索引为4
 
   ![](img/buffer_2.png)
 
-- 再从缓冲区把数据输出到通道，在此之前**必须调用`flip()`方法**，它将limit设为position当前位置，将position设为0
+- 如果从`buffer`输出数据，在此之前**必须调用`flip()`方法**，它将`limit`设为`position`当前位置，将`position`设为`0`
 
   ![](img/buffer_3.png)
 
-- 调用`get()`方法把数据从缓冲区输出到通道，position增加，limit不变，但position不会超过limit。把4字节数据都输出后
+- 调用`buffer.get()`方法或者`channel.write()`把让`buffer`输出数据后，`position`增加，`limit`不变，但`position`不会超过`limit`。把`4`字节数据都输出后，`position`、`limit`都指向4
 
   ![](img/buffer_4.png)
 
