@@ -111,3 +111,57 @@
 >
 > 这个类中的方法，如果没有指定返回值，那么会返回这个buffer本身。这就允许方法可以链接起来，比如：`b.flip();b.position(23);b.limit(42)`可以被`b.flip().position(23).limit(42)`替代。
 
+#### 零拷贝
+
+- 创建`ByteBuffer`时，可以用`ByteBuffer.allocate(1024)`创建指定大小的`HeapByteBuffer`对象，`HeapByteBuffer`也即在堆中分配的`ByteBuffer`；
+
+  也可以用`ByteBuffer.allocateDirect(1024)`来创建，它创建的是`DirectByteBuffer`对象
+
+  ```java
+      DirectByteBuffer(int cap) {                   
+          super(-1, 0, cap, cap);
+          boolean pa = VM.isDirectMemoryPageAligned();
+          int ps = Bits.pageSize();
+          long size = Math.max(1L, (long)cap + (pa ? ps : 0));
+          Bits.reserveMemory(size, cap);
+  
+          long base = 0;
+          try {
+              //DirectByteBuffer由unsafe对象调用native方法来分配
+              base = unsafe.allocateMemory(size);
+          } catch (OutOfMemoryError x) {
+              Bits.unreserveMemory(size, cap);
+              throw x;
+          }
+          unsafe.setMemory(base, size, (byte) 0);
+          if (pa && (base % ps != 0)) {
+              // Round up to page boundary
+              address = base + ps - (base & (ps - 1));
+          } else {
+              address = base;
+          }
+          cleaner = Cleaner.create(this, new Deallocator(base, size, cap));
+          att = null;
+      }
+  ```
+
+  `DirectByteBuffer`由`unsafe`对象调用`native`方法`allocateMemory`在堆外(操作系统中)分配。
+
+  由`Deallocator`释放，`Deallocator`是`DirectByteBuffer`的静态私有内部类，实现了`Runnable`方法，其`run`方法中通过`unsafe.freeMemory(address)`释放。
+
+- 在它们的父类`java.io.Buffer`中，有如下`address`字段，这个`address`只会被`direct buffer`所使用，之所以把它升级放在了`java.io.Buffer`中，是为了提升`JNI GetDirectBufferAddress`的速率。当使用`DirectByteBuffer`时由`address`来操作堆外内存，保证不会内存泄露。
+
+  ```java
+  	// Used only by direct buffers
+      // NOTE: hoisted here for speed in JNI GetDirectBufferAddress
+      long address;
+  ```
+
+- 在堆中分配的`HeapByteBuffer`，它的字节数组是在java堆上分配的，但进行IO操作时，操作系统并不直接处理堆上的字节数组，而是在操作系统上开辟一块内存区域，将堆上字节数组的数据拷贝到该内存区域，然后该内存区域与IO设备进行交互
+
+- 如果使用`DirectByteBuffer`，就不会在堆上分配数组，而是直接在操作系统中分配。就少了一次数据拷贝的过程。
+
+- 为何操作系统不直接访问java堆上的数据，而要拷贝到堆外：操作系统在内核态是可以访问任何一块内存区域的，如果访问堆，会通过JNI方式来访问，内存地址确定了，才能根据地址访问。但如果访问时，发生了GC，可能碰到标记-压缩，压缩后对象地址就发生了变化，再访问就出问题了。如果不GC，有可能会发生`OutOfMemoryError`。如果让对象位置不移动，也不可行。所以不能直接访问java堆上的数据
+
+- 进行IO操作时，IO速度相对较慢，将堆上数据拷贝到操作系统相对较快(JVM保证拷贝时不会GC)，所以是可行的。
+
