@@ -36,7 +36,7 @@
 - Channel值得是可以向其写入数据或者从中读取数据的对象
 - Channel是双向的，一个流只可能是输入流或者输出流，但Channel打开后可以读、写
 
-### java.io.Buffer
+### java.nio.Buffer
 
 > 一个具体的原生类型的数据容器
 >
@@ -164,4 +164,19 @@
 - 为何操作系统不直接访问java堆上的数据，而要拷贝到堆外：操作系统在内核态是可以访问任何一块内存区域的，如果访问堆，会通过JNI方式来访问，内存地址确定了，才能根据地址访问。但如果访问时，发生了GC，可能碰到标记-压缩，压缩后对象地址就发生了变化，再访问就出问题了。如果不GC，有可能会发生`OutOfMemoryError`。如果让对象位置不移动，也不可行。所以不能直接访问java堆上的数据
 
 - 进行IO操作时，IO速度相对较慢，将堆上数据拷贝到操作系统相对较快(JVM保证拷贝时不会GC)，所以是可行的。
+
+### java.nio.MappedByteBuffer
+
+- 是`java.nio.ByteBuffer`的子类，`java.nio.ByteBuffer`又是`java.nio.Buffer`的子类
+- 是一种允许程序直接从内存访问的特殊文件，可以将文件映射到内存中，由操作系统负责将内存修改写入到文件中，我们只需要处理内存的数据。用于内存映射的文件内存本身是在堆外，
+
+> 一个`direct byte buffer`，内容是一个文件的内存映射区域(`memory-mapped region`)
+>
+> `MappedByteBuffer`可以通过`java.nio.channels.FileChannel.map()`创建
+>
+> 一个`mapped byte buffer`以及它所代表的文件映射在`buffer`本身被垃圾回收前一直有效
+>
+> `mapped byte buffer`的内容随时可以更改。
+>
+> 
 
