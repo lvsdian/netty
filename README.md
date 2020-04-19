@@ -177,6 +177,57 @@
 > 一个`mapped byte buffer`以及它所代表的文件映射在`buffer`本身被垃圾回收前一直有效
 >
 > `mapped byte buffer`的内容随时可以更改。
+
+### java.nio.channels.Selector
+
+> 是一个双工的`java.nio.channels.SelectableChannel`对象
 >
-> 
+> `selector`可以通过调用这个类的`open()`方法来创建，`open()`会使用系统默认的`java.nio.channels.spi.SelectorProvider`选择器提供者来创建新的`selector`，`selector`也可以通过一个自定义的`selector`提供者调用`java.nio.channels.spi.SelectorProvider.openSelector()`方法来创建，一个`selector`在调用它的`close()`方法之前会一直处于`open`状态
+>
+> 一个可选择的`channel`注册到`selector`上是通过`SelectionKey`对象来表示的，一个`selector`维护三个`selection key`集合：
+>
+> - `key set`：它包含的`key`表示当前`selector`上注册的`channel`，这个集合通过`keys()`方法返回
+> - `selected-key set`：这个集合通过`selectedKeys()`方法返回，它永远是`key set`的一个子集
+> - `cancelled-key  set`：它表示`key`已经被取消了，但`channel`还没被取消，这个集合不能直接访问。`cancelled-key set`也永远是`key set`的一个子集。
+>
+> 在一个新的`selector`新创建时，这三个集合都是空的
+>
+> 一个`key`被添加到`selector`的`key set`中是作为通过`SelectableChannel.register(Selector,int)`方法注册一个`channel`的副作用(就是说注册`channel`就会把`key`添加到`selector`中)，在`selection`操作中`cancelled key`会从`key set`中移除。`key set`本身是不能直接被修改的。
+>
+> 一个`key`当它被取消时，它会被添加到它的`selector`的`cancelled-key set`中，无论是通过关闭它的`channel`还是调用`SelectionKey.cancel()`方法。取消一个`key`会导致在下次`selection`操作中它的`channel`会被取消注册，此时这个`key`会从`selector`的所有`key`集合中移除掉。
+>
+> 通过`selection`操作，`key`会被添加到`selected-key set`中，一个`key`可能通过调用这个`set`的`java.util.Set.remove(java.lang.Object)`方法或者根据这个`set`获得的`iterator`的`java.util.Iterator.remove()`方法直接从`set`中移除。`key`不会以任何其他的方式从`selected-key set`中移除。
+>
+> 在每一个`selection`操作中，`key`可能被添加到一个`selector`的`selected-key set`中或者从`selector`的`selected-key set`中移除，也可能从`cancelled-key set`中移除，`selection`操作是通过`select()`、`select(long)`、`selectNow()`等方法来执行的，分为三个步骤：
+>
+> - 在`cancelled-key set`中的每个`key`都会从`set`中被移除掉，它的`channel`会被取消注册，这个步骤使得`cancelled-key set`变为空集合
+>
+> - 在`selection`操作开始时，底层的操作系统会查询是否更新未被取消注册的`channel`的准备状况，执行任何我们的感兴趣的操作，对于准备有至少一个操作的`channel`，如下两个动作会被执行：
+>
+>   - 如果`channel`的`key`不在`selected-key set`中，它会被添加到`set`中，它的`ready-operation set`会被修改以精确地表示`channel`已经报告准备好的这些`operation`，任何之前记录的准备信息会被丢弃掉。
+>   - 如果`channel`的`key`已在`selected-key set`中，它的`ready-operation set`会被修改以便标识`channel`已经报告准备好的任何新的操作。之前所记录的准备信息会被保留下来，换句话说，由操作系统返回的准备集合会按位的方式放到`key`的当前的准备集合中。
+>
+>   如果`key set`中所有的`key`在这个步骤开始时没有感兴趣的集合，那么`selected-key  set`或者任何`key`的`ready-operation`都不会被更新
+>
+> - 如果在步骤2中有任何`key`被添加到`cancelled-key set`中，那么它们会在步骤1中被处理
+>
+> 无论一个`selection`操作是否阻塞的等待一个或多个通道变得可用，如果是，等待多长时间，这是这三个`selection`方法的本质区别。
+>
+> 一个`selector`的`key`和`selected-key set`在多线程并发中使用通常不是安全的，如果一个线程直接修改集合中的一个，那么这个访问要通过`set`本身做一个同步。由`set`的`java.util.Set.iterator()`方法所返回的`iterator`是快速失败的，如果在`iterator`创建后`set`被修改了，处理调用`iterator`自己的`java.util.Iterator.remove()`方法之外，任何其他修改都会导致`java.util.ConcurrentModificationException`
+
+#### java.nio.channels.Selector.open()
+
+> 打开一个选择器
+>
+> 新的`selector`是系统范围内的`java.nio.channels.spi.SelectorProvider`对象通过调用`java.nio.channels.spi.SelectorProvider.openSelector()`来创建，
+
+### java.nio.channels.SelectionKey
+
+> 一个代表`java.nio.channels.SelectableChannel`注册到`java.nio.channels.Selector`的`token`。
+>
+> 每次一个`channel`注册到`selector`上`selection key`都会被创建，在调用它的`cancel()`方法或者关闭它的`channel`之前，这个`key`都有效。取消一个`key`，不会立马从它的`selector`中移除，而是在下次进行`selection`操作时添加到`cancelled-key set`进行移除。`key`的有效性可以通过`isValid()`方法检测
+>
+> 一个`selecton key`包含两个用整数表示的操作集合，每组操作集合表示`key`的`channel`支持的`selectable`操作的分类。
+>
+> - `ready set`/`interest set`
 
