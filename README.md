@@ -231,3 +231,31 @@
 >
 > - `ready set`/`interest set`
 
+### 零拷贝
+
+- 传统方式
+
+  1. 用户向`kernel`发送`read()`系统调用，切换到内核模式，`kernel`通过`DMA(direct memeory access`)方式将数据从硬盘拷贝到`kernel buffer`中
+  2. 将`kernel buffer`数据拷贝到`user buffer`中
+  3. 执行业务逻辑
+  4. 用户向`kernel`发送`write()`系统调用，将`user buffer`数据拷贝到`kernel socket buffer`，该数据写到网络中后，`write()`返回
+
+  - 四次切换、两次数据拷贝
+
+  ![](img/zero_copy_1.png)
+
+- 零拷贝(依赖OS)
+
+  1. 用户向`kernel`发送`sendfile()`系统调用，切换到内核模式，`kernel`通过`DMA(direct memeory access`)方式将数据从硬盘拷贝到`kernel buffer`中
+  2. `kernel`将数据写到`target socket buffer`中，从其中发送数据
+  3. 发送完后`sendfile()`返回
+
+  - 没有内核空间与用户空间之间的数据拷贝，但内核空间中存在数据拷贝(`kernel buffer --> target socket buffer`)
+
+  ![](img/zero_copy_2.png)
+
+- 
+
+  1. 用户向`kernel`发送`sendfile()`系统调用，切换到内核模式，`kernel`通过`DMA(direct memeory access`)方式将数据从硬盘拷贝到`kernel buffer`中，还可以通过`scatter/gather DMA`方式将数据读取到`kernel buffer`中
+
+  ![](img/zero_copy_3.png)
