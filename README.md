@@ -270,3 +270,33 @@
   3. **`protocol engine(协议引擎)`完成数据发送时，从两个`buffer`中读取信息。即`gather(收集)`操作**
 
      ![](img/zero_copy_4.png)
+
+### io.netty.channel.EventLoopGroup
+
+> 是一个特殊的`io.netty.util.concurrent.EventExecutorGroup`，在进行事件循环的过程中，在选择操作时允许注册`channel`
+
+#### io.netty.channel.EventLoopGroup#next
+
+> 返回下一个要使用的`io.netty.channel.EventLoop`
+
+#### io.netty.channel.EventLoopGroup#register(io.netty.channel.Channel)
+
+> 将一个`channel`注册到`io.netty.channel.EventLoop`中，当注册完成时返回的`io.netty.channel.ChannelFuture`对象会收到通知。
+
+#### io.netty.channel.EventLoopGroup#register(io.netty.channel.ChannelPromise)
+
+> 使用一个`io.netty.channel.ChannelFuture`将一个`channel`注册到`io.netty.channel.EventLoop`中，当注册完成时传入的`io.netty.channel.ChannelFuture`会收到通知并进行返回。
+
+### io.netty.channel.nio.NioEventLoopGroup
+
+> 是`io.netty.channel.MultithreadEventLoopGroup`的一个实现，它用于基于`io.netty.channel.Channel`的NIO`java.nio.channels.Selector`对象
+
+```java
+	/**
+	 * 使用默认的线程数、默认的java.util.concurrent.ThreadFactory，以及java.nio.channels.spi.SelectorProvider的provider()方法返回的SelectorProvider创建新的实例，
+	 */
+	public NioEventLoopGroup() {
+        this(0);
+    }
+```
+
