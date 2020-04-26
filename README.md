@@ -235,27 +235,38 @@
 
 - 传统方式
 
-  1. 用户向`kernel`发送`read()`系统调用，切换到内核模式，`kernel`通过`DMA(direct memeory access`)方式将数据从硬盘拷贝到`kernel buffer`中
-  2. 将`kernel buffer`数据拷贝到`user buffer`中
+  1. 用户向`kernel`发送`read()`系统调用，切换到内核空间，`kernel`通过`DMA(direct memeory access`)方式将数据从硬盘拷贝到`kernel buffer`中
+  2. 将`kernel buffer`数据拷贝到`user buffer`中，切换到用户空间
   3. 执行业务逻辑
-  4. 用户向`kernel`发送`write()`系统调用，将`user buffer`数据拷贝到`kernel socket buffer`，该数据写到网络中后，`write()`返回
+  4. 用户向`kernel`发送`write()`系统调用，切换到内核空间，将`user buffer`数据拷贝到`kernel buffer`中，将`kernel buffer`数据拷贝到`kernel socket buffer`，该数据写到网络中后，`write()`返回，切换到用户空间
 
-  - 四次切换、两次数据拷贝
+  - 四次切换、四次数据拷贝
 
-  ![](img/zero_copy_1.png)
+  <img src="img/zero_copy_1.png" style="zoom:80%;" />
 
-- 零拷贝(依赖OS)
+- 
 
   1. 用户向`kernel`发送`sendfile()`系统调用，切换到内核模式，`kernel`通过`DMA(direct memeory access`)方式将数据从硬盘拷贝到`kernel buffer`中
   2. `kernel`将数据写到`target socket buffer`中，从其中发送数据
   3. 发送完后`sendfile()`返回
 
   - 没有内核空间与用户空间之间的数据拷贝，但内核空间中存在数据拷贝(`kernel buffer --> target socket buffer`)
+  - 两次数据拷贝
 
-  ![](img/zero_copy_2.png)
+  <img src="img/zero_copy_2.png" style="zoom:80%;" />
 
 - 
 
   1. 用户向`kernel`发送`sendfile()`系统调用，切换到内核模式，`kernel`通过`DMA(direct memeory access`)方式将数据从硬盘拷贝到`kernel buffer`中，还可以通过`scatter/gather DMA`方式将数据读取到`kernel buffer`中
 
-  ![](img/zero_copy_3.png)
+  <img src="img/zero_copy_3.png" style="zoom: 80%;" />
+
+- 零拷贝
+
+  1. 发送`sendfile`系统调用前处于用户空间；发送`sendfile`系统调用后处于内核空间；执行完后又回到用户空间
+
+  2. **将磁盘数据拷贝到`kernel buffer`中，再将`kernel buffer`中数据的`fd(文件描述符)`拷贝到`socket buffer`中，`fd`包含：数据的内存地址、数据的长度。不再需要将数据拷贝到`socket buffer`中了。**
+
+  3. **`protocol engine(协议引擎)`完成数据发送时，从两个`buffer`中读取信息。即`gather(收集)`操作**
+
+     ![](img/zero_copy_4.png)
