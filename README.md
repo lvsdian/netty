@@ -293,7 +293,8 @@
 
 ```java
 	/**
-	 * 使用默认的线程数、默认的java.util.concurrent.ThreadFactory，以及java.nio.channels.spi.SelectorProvider的provider()方法返回的SelectorProvider创建新的实例，
+	 * 使用默认的线程数、默认的java.util.concurrent.ThreadFactory，以及
+	 * java.nio.channels.spi.SelectorProvider的provider()方法返回的SelectorProvider创建新的实例，
 	 */
 	public NioEventLoopGroup() {
         this(0);
