@@ -271,33 +271,81 @@
 
      ![](img/zero_copy_4.png)
 
-### io.netty.channel.EventLoopGroup
+### EventExecutorGroup
+
+> `EventExecutorGroup`通过它的`next()`方法提供`io.netty.util.concurrent.EventExecutor`进行使用，除此之外，还负责它们的生命周期以及对它们以全局的方式进行关闭
+
+- EventExecutor next()
+
+> 返回由`EventExecutorGroup`所管理的`io.netty.util.concurrent.EventExecutor`
+
+### EventLoopGroup
+
+- 继承自`EventExecutorGroup`接口
 
 > 是一个特殊的`io.netty.util.concurrent.EventExecutorGroup`，在进行事件循环的过程中，在选择操作时允许注册`channel`
 
-#### io.netty.channel.EventLoopGroup#next
+- EventLoop next()
 
 > 返回下一个要使用的`io.netty.channel.EventLoop`
 
-#### io.netty.channel.EventLoopGroup#register(io.netty.channel.Channel)
+- ChannelFuture register(Channel channel)
 
 > 将一个`channel`注册到`io.netty.channel.EventLoop`中，当注册完成时返回的`io.netty.channel.ChannelFuture`对象会收到通知。
 
-#### io.netty.channel.EventLoopGroup#register(io.netty.channel.ChannelPromise)
+- ChannelFuture register(ChannelPromise promise)
 
 > 使用一个`io.netty.channel.ChannelFuture`将一个`channel`注册到`io.netty.channel.EventLoop`中，当注册完成时传入的`io.netty.channel.ChannelFuture`会收到通知并进行返回。
 
-### io.netty.channel.nio.NioEventLoopGroup
+### NioEventLoopGroup
+
+继承`MultithreadEventLoopGroup`类，`MultithreadEventLoopGroup`类实现了`EventLoopGroup`接口
 
 > 是`io.netty.channel.MultithreadEventLoopGroup`的一个实现，它用于基于`io.netty.channel.Channel`的NIO`java.nio.channels.Selector`对象
 
 ```java
 	/**
 	 * 使用默认的线程数、默认的java.util.concurrent.ThreadFactory，以及
-	 * java.nio.channels.spi.SelectorProvider的provider()方法返回的SelectorProvider创建新的实例，
+	 * java.nio.channels.spi.SelectorProvider的provider()方法返回的SelectorProvider创建新的实
+	 * 例
 	 */
 	public NioEventLoopGroup() {
         this(0);
     }
+
+	/**
+	 * 使用指定的线程数、java.util.concurrent.ThreadFactory以及java.nio.channels.spi.
+	 * SelectorProvider的provider()方法返回的SelectorProvider创建新的实例
+	 *
+	 */
+	public NioEventLoopGroup(int nThreads) {
+        this(nThreads, (Executor) null);
+    }
+
+	// ...
+    
+	// 构造方法中nThreads的取值：nThreads == 0 ? DEFAULT_EVENT_LOOP_THREADS : nThreads
+	// 其父类MultithreadEventLoopGroup中设置DEFAULT_EVENT_LOOP_THREADS如下：
+	private static final int DEFAULT_EVENT_LOOP_THREADS;
+    static {
+        // 如果没有配置io.netty.eventLoopThreads，就取 系统核数 * 2，否则取配置的数量，最小取1
+        DEFAULT_EVENT_LOOP_THREADS = Math.max(1, SystemPropertyUtil.getInt(
+                "io.netty.eventLoopThreads", NettyRuntime.availableProcessors() * 2));
+    }
+	// 最终会执行MultithreadEventExecutorGroup抽象类中的构造方法，
+	// NioEventLoopGroup继承自MultithreadEventLoopGroup抽象类，
+	// MultithreadEventLoopGroup继承自MultithreadEventExecutorGroup抽象类，
+	// 该方法中根据nThreads生成EventExecutor children = new EventExecutor[nThreads]数组
+	// 对于数组每个元素，通过children[i] = newChild(executor, args)进行赋值
+	/** 
+	 * MultithreadEventExecutorGroup中的newChild方法
+	 * 创建一个新的EventExecutor，后续可通过next()方法进行访问它，这个方法将被服务与
+	 * MultithreadEventExecutorGroup的每个线程所调用
+	 */
+	abstract EventExecutor newChild(Executor executor, Object... args) throws Exception
 ```
+
+### ServerBootstrap
+
+> `io.netty.bootstrap.Bootstrap`的一个子类，使得我们可以轻松的启动`io.netty.channel.ServerChannel`
 
