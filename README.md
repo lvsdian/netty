@@ -12,7 +12,7 @@
 
 - 提供了高度可定制化的线程模型，单线程、一个或多个线程池等，比如`SEDA`
 
-  > SEDA：Staged Event Driven Architecture，把一个请求处理过程分成若干Stage，不同的Stage使用不同数量的线程来处理
+  > `SEDA：Staged Event Driven Architecture`，把一个请求处理过程分成若干`Stage`，不同的`Stage`使用不同数量的线程来处理
 
 - 可以真正实现无连接的数据报支持
 
@@ -30,11 +30,11 @@
 
 ### NIO
 
-- BIO中最为核心的概念是流(Stream)，面向流编程，一个流要么是输入流，要么是输出流
-- NIO核心：通道、缓冲区、选择器。NIO中是面向块(block)或是缓冲区(buffer)编程的
-- Buffer本身就是一块内存，实际是个数组，数据的读写都是通过buffer来实现
-- Channel值得是可以向其写入数据或者从中读取数据的对象
-- Channel是双向的，一个流只可能是输入流或者输出流，但Channel打开后可以读、写
+- `BIO`中最为核心的概念是流(`Stream`)，面向流编程，一个流要么是输入流，要么是输出流
+- `NIO`核心：通道、缓冲区、选择器。`NIO`中是面向块(`block`)或是缓冲区(`buffer`)编程的
+- `Buffer`本身就是一块内存，实际是个数组，数据的读写都是通过`buffer`来实现
+- `Channel`值得是可以向其写入数据或者从中读取数据的对象
+- `Channel`是双向的，一个流只可能是输入流或者输出流，但`Channel`打开后可以读、写
 
 ### java.nio.Buffer
 
@@ -61,19 +61,19 @@
   ![](img/buffer_3.png)
 
 - 调用`buffer.get()`方法或者`channel.write()`把让`buffer`输出数据后，`position`增加，`limit`不变，但`position`不会超过`limit`。把`4`字节数据都输出后，`position`、`limit`都指向4
-- 比如创建一个大小为10的ByteBuffer对象，初始时position=0，limit和capacity为10
+- 比如创建一个大小为10的`ByteBuffer`对象，初始时`position`=0，`limit`和`capacity`为10
 
   ![](img/buffer_1.png)
 
-- 调用`put()`方法从通道中读4个字节数据到缓冲区后，position指向4，即下一个操作的字节索引为4
+- 调用`put()`方法从通道中读4个字节数据到缓冲区后，`position`指向4，即下一个操作的字节索引为4
 
   ![](img/buffer_2.png)
 
-- 再从缓冲区把数据输出到通道，在此之前**必须调用`flip()`方法**，它将limit设为position当前位置，将position设为0
+- 再从缓冲区把数据输出到通道，在此之前**必须调用`flip()`方法**，它将`limit`设为`position`当前位置，将`position`设为0
 
   ![](img/buffer_3.png)
 
-- 调用`get()`方法把数据从缓冲区输出到通道，position增加，limit不变，但position不会超过limit。把4字节数据都输出后
+- 调用`get()`方法把数据从缓冲区输出到通道，`position`增加，`limit`不变，但`position`不会超过`limit`。把4字节数据都输出后
 
   ![](img/buffer_4.png)
 
@@ -85,31 +85,31 @@
 >
 > 每个子类都定义了两类`get`和`put`操作
 >
-> 相对操作：从当前position开始根据传入的元素个数增加position位置，读或写一个或多个元素。如果所要求的转换超过了limit大小，那么相对的get操作会抛出`BufferUnderflowException`异常，相对的put操作会抛出`BufferOverflowException`异常，无论哪种情况，都没有数据传输
+> 相对操作：从当前`position`开始根据传入的元素个数增加`position`位置，读或写一个或多个元素。如果所要求的转换超过了`limit`大小，那么相对的get操作会抛出`BufferUnderflowException`异常，相对的put操作会抛出`BufferOverflowException`异常，无论哪种情况，都没有数据传输
 >
-> 绝对操作：接收一个显示的元素索引，不会影响position，如果操作的元素索引超出了limit大小，那么get或put操作会抛出`IndexOutOfBoundsException`异常
+> 绝对操作：接收一个显示的元素索引，不会影响`position`，如果操作的元素索引超出了limit大小，那么get或put操作会抛出`IndexOutOfBoundsException`异常
 >
-> 数据还可以通过恰当的IO通道这种操作来输入或者从buffer输出，它总是相对于当前的position。
+> 数据还可以通过恰当的IO通道这种操作来输入或者从`buffer`输出，它总是相对于当前的`position`。
 >
-> 一个buffer的mark表示当`reset()`方法被调用时它的position会被重置到那个索引位置。如果mark定义了，当position或者limit调节到比mark小的值时，mark会被丢弃。如果mark没有定义，但调用了`reset()`方法，就会抛出`InvalidMarkException`异常。
+> 一个buffer的mark表示当`reset()`方法被调用时它的`position`会被重置到那个索引位置。如果`mark`定义了，当position或者limit调节到比`mark`小的值时，`mark`会被丢弃。如果`mark`没有定义，但调用了`reset()`方法，就会抛出`InvalidMarkException`异常。
 
 - **`0 <= mark <= position <= limit <= capacity`**
 
-> 一个新创建的buffer，它的position值总是为0，mark值是未定义的。limit值可能是0，也可能是其他值，取决于buffer构建的方式，新分配的buffer它的每个值都是0
+> 一个新创建的`buffer`，它的`position`值总是为0，`mark`值是未定义的。`limit`值可能是0，也可能是其他值，取决于`buffer`构建的方式，新分配的`buffer`它的每个值都是0
 >
-> 除了访问position，limit，capacity值及重置mark值之外，这个类还定义了如下操作
+> 除了访问`position`，`limit`，`capacity`值及重置`mark`值之外，这个类还定义了如下操作
 >
-> `clear()`让一个buffer准备好一个新的通道的读或者相对的`put()`操作，它会将limit设为capacity的值，将position设为0。
+> `clear()`让一个`buffer`准备好一个新的通道的读或者相对的`put()`操作，它会将`limit`设为`capacity`的值，将`position`设为0。
 >
-> `flip()`让一个buffer准备好一个新的通道的写或者相对的`get()`操作，它会将limit设为position的值，将position设为0。
+> `flip()`让一个`buffer`准备好一个新的通道的写或者相对的`get()`操作，它会将`limit`设为`position`的值，将`position`设为0。
 >
-> `rewind()`让一个buffer准备好重新读它已经包含的数据，它会将limit保持不变，将position设置为0。
+> `rewind()`让一个`buffer`准备好重新读它已经包含的数据，它会将`limit`保持不变，将`position`设置为0。
 >
-> 每个buffer都是可读的，但不是每个buffer都是可写的，每个buffer的可变方法都被指定为可选操作。如果在只读buffer上调用写方法会抛出`ReadOnlyBufferException`异常。只读buffer不允许内容发生改变，但它的mark、position、limit值是可以变化的，无论一个buffer只读与否，都可以通过`isReadOnly()`方法来判断。
+> 每个`buffer`都是可读的，但不是每个buffer都是可写的，每个buffer的可变方法都被指定为可选操作。如果在只读`buffer`上调用写方法会抛出`ReadOnlyBufferException`异常。只读buffer不允许内容发生改变，但它的`mark`、`position`、`limit`值是可以变化的，无论一个`buffer`只读与否，都可以通过`isReadOnly()`方法来判断。
 >
-> buffer不是线程安全的，如果buffer在多线程中使用，需要进行同步操作
+> `buffer`不是线程安全的，如果buffer在多线程中使用，需要进行同步操作
 >
-> 这个类中的方法，如果没有指定返回值，那么会返回这个buffer本身。这就允许方法可以链接起来，比如：`b.flip();b.position(23);b.limit(42)`可以被`b.flip().position(23).limit(42)`替代。
+> 这个类中的方法，如果没有指定返回值，那么会返回这个`buffer`本身。这就允许方法可以链接起来，比如：`b.flip();b.position(23);b.limit(42)`可以被`b.flip().position(23).limit(42)`替代。
 
 #### 零拷贝
 
@@ -152,7 +152,7 @@
 - 在它们的父类`java.io.Buffer`中，有如下`address`字段，这个`address`只会被`direct buffer`所使用，之所以把它升级放在了`java.io.Buffer`中，是为了提升`JNI GetDirectBufferAddress`的速率。当使用`DirectByteBuffer`时由`address`来操作堆外内存，保证不会内存泄露。
 
   ```java
-  	// Used only by direct buffers
+      // Used only by direct buffers
       // NOTE: hoisted here for speed in JNI GetDirectBufferAddress
       long address;
   ```
@@ -215,7 +215,7 @@
 >
 > 一个`selector`的`key`和`selected-key set`在多线程并发中使用通常不是安全的，如果一个线程直接修改集合中的一个，那么这个访问要通过`set`本身做一个同步。由`set`的`java.util.Set.iterator()`方法所返回的`iterator`是快速失败的，如果在`iterator`创建后`set`被修改了，处理调用`iterator`自己的`java.util.Iterator.remove()`方法之外，任何其他修改都会导致`java.util.ConcurrentModificationException`
 
-#### java.nio.channels.Selector.open()
+- `open()`
 
 > 打开一个选择器
 >
@@ -275,35 +275,35 @@
 
 
 
-#### EventExecutorGroup
+#### `io.netty.util.concurrent.EventExecutorGroup`
 
 > `EventExecutorGroup`通过它的`next()`方法提供`io.netty.util.concurrent.EventExecutor`进行使用，除此之外，还负责它们的生命周期以及对它们以全局的方式进行关闭
 
-- EventExecutor next()
+##### `EventExecutor next()`
 
 > 返回由`EventExecutorGroup`所管理的`io.netty.util.concurrent.EventExecutor`
 
-#### EventLoopGroup
+#### `io.netty.channel.EventLoopGroup`
 
 - 继承自`EventExecutorGroup`接口
 
 > 是一个特殊的`io.netty.util.concurrent.EventExecutorGroup`，在进行事件循环的过程中，在选择操作时允许注册`channel`
 
-- EventLoop next()
+##### `EventLoop next()`
 
 > 返回下一个要使用的`io.netty.channel.EventLoop`
 
-- ChannelFuture register(Channel channel)
+##### `ChannelFuture register(Channel channel)`
 
 > 将一个`channel`注册到`io.netty.channel.EventLoop`中，当注册完成时返回的`io.netty.channel.ChannelFuture`对象会收到通知。
 
-- ChannelFuture register(ChannelPromise promise)
+##### `ChannelFuture register(ChannelPromise promise)`
 
 > 使用一个`io.netty.channel.ChannelFuture`将一个`channel`注册到`io.netty.channel.EventLoop`中，当注册完成时传入的`io.netty.channel.ChannelFuture`会收到通知并进行返回。
 
-#### NioEventLoopGroup
+#### `io.netty.channel.nio.NioEventLoopGroup`
 
-继承`MultithreadEventLoopGroup`类，`MultithreadEventLoopGroup`类实现了`EventLoopGroup`接口
+- 继承`MultithreadEventLoopGroup`类，`MultithreadEventLoopGroup`类实现了`EventLoopGroup`接口
 
 > 是`io.netty.channel.MultithreadEventLoopGroup`的一个实现，它用于基于`io.netty.channel.Channel`的NIO`java.nio.channels.Selector`对象
 
@@ -349,13 +349,15 @@
 	abstract EventExecutor newChild(Executor executor, Object... args) throws Exception
 ```
 
-#### ServerBootstrap
+#### `io.netty.bootstrap.ServerBootstrap`
 
 > `io.netty.bootstrap.Bootstrap`的一个子类，使得我们可以轻松的启动`io.netty.channel.ServerChannel`
 >
 > `ServerChannel`：一个标记接口（和`java.io.Serializable`一样），会接收另外一端发过来的连接请求，并通过接收它们来创建`child`   `io.netty.channel.Channel`，例如`io.netty.channel.socket.ServerSocketChannel`。
 
-- group(EventLoopGroup parentGroup, EventLoopGroup childGroup)
+##### `group(EventLoopGroup parentGroup, EventLoopGroup childGroup)`
+
+- `ServerBootstrap`类中的`group`方法
 
 > 给`parent(acceptor)`和`child(client)`设置`EventLoopGroup`，这些`EventLoopGroup`用于处理`ServerChannel`和`Channel`的所有事件和IO
 >
@@ -374,20 +376,107 @@
 > }
 > ```
 
-- channel(Class<? extends C> channelClass)
+##### `channel(Class<? extends C> channelClass)`
+
+其父类`AbstractBootstrap`类中的`channel`方法
 
 > 根据Class对象，创建对应的`io.netty.channel.Channel`实例。如果你的`Channel`没有无参的构造方法，要么使用这个，要么使用`channelFactory(io.netty.channel.ChannelFactory)`
 >
 > ```java
 > public B channel(Class<? extends C> channelClass) {
->     if (channelClass == null) {
->         throw new NullPointerException("channelClass");
->     }
+>     // ...
 >     return channelFactory(new ReflectiveChannelFactory<C>(channelClass));
 > }
 > /** 
 >  * ReflectiveChannelFactory实现了ChannelFactory，它会以反射的方式通过调用默认构造方法实例化一
->  * 个新的Channel对象
+>  * 个新的Channel对象C
+>  * 这里new ReflectiveChannelFactory()后，传给channelFactory做参数，类型为ChannelFactory
 >  */
+> 
+> /**
+>  * io.netty.channel.ChannelFactory用于在调用bind()方法时创建Channel实例。这个方法通常在由于
+>  * 复杂的需求导致channel()方法无法使用时才使用，如果你的Channel实现有一个无参构造器，那么非常推荐
+>  * 直接使用channel()方法来简化你的代码
+>  */
+> public B channelFactory(io.netty.channel.ChannelFactory<? extends C> channelFactory) {
+>     return channelFactory((ChannelFactory<C>) channelFactory);
+> }
+> 
+> /** 这个channelFactory方法就是为了给channelFactory属性赋值 */
+> public B channelFactory(ChannelFactory<? extends C> channelFactory) {
+>     // ...
+>     this.channelFactory = channelFactory;
+>     return (B) this;
+> }
 > ```
 
+#####`io.netty.channel.socket.nio.NioServerSocketChannel`
+
+> 是`io.netty.channel.socket.ServerSocketChannel`的一个实现，它使用了`NIO`的`selector`的实现来接收新的连接
+
+##### `childHandler(ChannelHandler childHandler)`
+
+- `ServerBootstrap`类中的`childHandler`方法
+
+> 赋值`childHandler`，用于服务`Channel`的请求
+>
+> ```java
+> public ServerBootstrap childHandler(ChannelHandler childHandler) {
+>     // ...
+>     this.childHandler = childHandler;
+>     return this;
+> }
+> ```
+
+##### `ChannelFuture bind(int inetPort)`
+
+- 其父类`AbstractBootstrap`类中的`bind`方法
+
+> 创建一个新的`Channel`并绑定它
+>
+> ```java
+> public ChannelFuture bind(int inetPort) {
+>     return bind(new InetSocketAddress(inetPort));
+> }
+> 
+> public ChannelFuture bind(SocketAddress localAddress) {
+>     // ...
+>     return doBind(localAddress);
+> }
+> 
+> private ChannelFuture doBind(final SocketAddress localAddress) {
+>     final ChannelFuture regFuture = initAndRegister();
+>     final Channel channel = regFuture.channel();
+>     if (regFuture.cause() != null) {
+>         return regFuture;
+>     }
+>     if (regFuture.isDone()) {
+>         // At this point we know that the registration was complete and successful.
+>         ChannelPromise promise = channel.newPromise();
+>         doBind0(regFuture, channel, localAddress, promise);
+>         return promise;
+>     } else {
+>         // Registration future is almost always fulfilled already, but just in case it's not.
+>         final PendingRegistrationPromise promise = new PendingRegistrationPromise(channel);
+>         regFuture.addListener(new ChannelFutureListener() {
+>             @Override
+>             public void operationComplete(ChannelFuture future) throws Exception {
+>                 Throwable cause = future.cause();
+>                 if (cause != null) {
+>                     // Registration on the EventLoop failed so fail the ChannelPromise directly to not cause an
+>                     // IllegalStateException once we try to access the EventLoop of the Channel.
+>                     promise.setFailure(cause);
+>                 } else {
+>                     // Registration was successful, so set the correct executor to use.
+>                     // See https://github.com/netty/netty/issues/2586
+>                     promise.registered();
+>                     doBind0(regFuture, channel, localAddress, promise);
+>                 }
+>             }
+>         });
+>         return promise;
+>     }
+> }
+> ```
+
+#### `io.netty.channel.ChannelFuture`
