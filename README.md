@@ -271,7 +271,11 @@
 
      ![](img/zero_copy_4.png)
 
-### EventExecutorGroup
+### 源码分析
+
+
+
+#### EventExecutorGroup
 
 > `EventExecutorGroup`通过它的`next()`方法提供`io.netty.util.concurrent.EventExecutor`进行使用，除此之外，还负责它们的生命周期以及对它们以全局的方式进行关闭
 
@@ -279,7 +283,7 @@
 
 > 返回由`EventExecutorGroup`所管理的`io.netty.util.concurrent.EventExecutor`
 
-### EventLoopGroup
+#### EventLoopGroup
 
 - 继承自`EventExecutorGroup`接口
 
@@ -297,7 +301,7 @@
 
 > 使用一个`io.netty.channel.ChannelFuture`将一个`channel`注册到`io.netty.channel.EventLoop`中，当注册完成时传入的`io.netty.channel.ChannelFuture`会收到通知并进行返回。
 
-### NioEventLoopGroup
+#### NioEventLoopGroup
 
 继承`MultithreadEventLoopGroup`类，`MultithreadEventLoopGroup`类实现了`EventLoopGroup`接口
 
@@ -345,7 +349,45 @@
 	abstract EventExecutor newChild(Executor executor, Object... args) throws Exception
 ```
 
-### ServerBootstrap
+#### ServerBootstrap
 
 > `io.netty.bootstrap.Bootstrap`的一个子类，使得我们可以轻松的启动`io.netty.channel.ServerChannel`
+>
+> `ServerChannel`：一个标记接口（和`java.io.Serializable`一样），会接收另外一端发过来的连接请求，并通过接收它们来创建`child`   `io.netty.channel.Channel`，例如`io.netty.channel.socket.ServerSocketChannel`。
+
+- group(EventLoopGroup parentGroup, EventLoopGroup childGroup)
+
+> 给`parent(acceptor)`和`child(client)`设置`EventLoopGroup`，这些`EventLoopGroup`用于处理`ServerChannel`和`Channel`的所有事件和IO
+>
+> ```java
+> /** 这个方法的作用就是赋值bossGroup,workerGroup，也可以说parentGroup和childGroup */
+> public ServerBootstrap group(EventLoopGroup parentGroup, EventLoopGroup childGroup) {
+>     super.group(parentGroup);
+>     if (childGroup == null) {
+>         throw new NullPointerException("childGroup");
+>     }
+>     if (this.childGroup != null) {
+>         throw new IllegalStateException("childGroup set already");
+>     }
+>     this.childGroup = childGroup;
+>     return this;
+> }
+> ```
+
+- channel(Class<? extends C> channelClass)
+
+> 根据Class对象，创建对应的`io.netty.channel.Channel`实例。如果你的`Channel`没有无参的构造方法，要么使用这个，要么使用`channelFactory(io.netty.channel.ChannelFactory)`
+>
+> ```java
+> public B channel(Class<? extends C> channelClass) {
+>     if (channelClass == null) {
+>         throw new NullPointerException("channelClass");
+>     }
+>     return channelFactory(new ReflectiveChannelFactory<C>(channelClass));
+> }
+> /** 
+>  * ReflectiveChannelFactory实现了ChannelFactory，它会以反射的方式通过调用默认构造方法实例化一
+>  * 个新的Channel对象
+>  */
+> ```
 
