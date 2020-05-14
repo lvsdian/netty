@@ -480,3 +480,72 @@
 > ```
 
 #### `io.netty.channel.ChannelFuture`
+
+- `io.netty.channel.ChannelFuture`接口继承了`io.netty.util.concurrent.Future`，它又继承了`java.util.concurrent.Future`接口
+
+##### `java.util.concurrent.Future`
+
+> 一个`Future`代表一个异步计算的结果。`Future`提供了一些方法来检查计算是否完成了，还有些方法会等待计算的完成，还有些方法用来获取计算的结果。当计算完成时，计算的结果只能通过`get()`方法获取，计算完成之前`get()`方法会阻塞。取消操作是通过`cancle()`方法来完成的。此外`Future`还提供了附加的方法来确定任务是正常完成还是取消掉了。一旦计算完成，就不能被取消了。如果你想以取消为目的用了`Future`，但又没有提供一个可用的结果，你就可以声明这种形式的的`Future`，返回`null`作为它底层任务的结果。
+>
+> ```java
+> interface ArchiveSearcher { String search(String target); }
+> class App {
+>     ExecutorService executor = ...
+>     ArchiveSearcher searcher = ...
+>     void showSearch(final String target)throws InterruptedException {
+>         // 将target交给executor来执行，
+>         Future<String> future = executor.submit(new Callable<String>() {
+>             public String call() {
+>                 return searcher.search(target);
+>             }});
+>         // 主线程继续往下执行
+>         displayOtherThings(); 
+>         try {
+>             // 这里获取执行的结果
+>             displayText(future.get()); 
+>         } catch (ExecutionException ex) { 
+>             cleanup(); return; 
+>         }
+>     }
+> }
+> ```
+>
+> `java.util.concurrent.FutureTask`是`Future`的实现，它本身实现了`java.util.concurrent.RunnableFuture`，`RunnableFuture`实现了`java.lang.Runnable`、`java.util.concurrent.Future`接口，所以可以被`Executor`执行
+>
+> 比如说，上面`submit()`方法的构造器可以用以下来替代
+>
+> ```java
+> FutureTask<String> future = new FutureTask<String>(new Callable<String>() {
+>     public String call() {
+>         return searcher.search(target);
+>     }
+> });
+> executor.execute(future);
+> ```
+>
+> 内存一致性的影响：异步计算的动作一定在另一个线程通过`Future.get()`获取计算结果之前执行的。
+
+###### `get()`
+
+> 如果必要，会等待计算的完成，并获取结果
+
+###### `get(long timeout, TimeUnit unit)`
+
+> 如果可用的话，在必要时最多会等待给定的时间来等待计算的完成，然后获取结果
+
+###### `boolean cancel(boolean mayInterruptIfRunning)`
+
+> 尝试取消任务的执行，如果任务已经完成，或者已经取消，或由于其他原因不能被取消，这个尝试就会失败。如果取消成功，当`cancel()`方法调用时任务还没有开始，任务就不应该再运行了。如果任务已经启动了，`mayInterruptIfRunning`参数决定执行任务的这个线程是否可以被中断去停止这个任务。
+>
+> 这个方法调用之后，后续的`isDone()`方法将返回`true`，如果这个方法返回`true`，后续的`isCancelled()`就会返回`true`。
+
+###### `boolean isDone()`
+
+> 如果任务已经完成了返回`true`，对于正常结束、异常、取消操作这行情况都会返回`true`
+
+##### `io.netty.util.concurrent.Future`
+
+###### `Future<V> removeListener(GenericFutureListener<? extends Future<? super V>> listener)`
+
+> 给`Future`添加指定的`listener`，当`Future`的`isDone()`方法完成时，`listener`就会收到通知，如果`future`已经了，指定的`listener`就会立刻被通知到
+
