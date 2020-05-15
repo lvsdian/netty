@@ -1,4 +1,4 @@
-[toc]
+
 
 ### netty概述
 
@@ -40,13 +40,13 @@
 
 > 一个具体的原生类型的数据容器
 >
-> Buffer是一个线性的，特定原生类型元素的有限序列，除了它的内容之外，一个buffer重要的属性就是`capacity`，`limit`，`position`
+> Buffer是一个线性的，特定原生类型元素的有限序列，除了它的内容之外，一个`buffer`重要的属性就是`capacity`，`limit`，`position`
 >
-> 一个buffer的`capacity`就是它所包含的元素数量，一个buffer的`capacity`不会为负数并且不会变化
+> 一个`buffer`的`capacity`就是它所包含的元素数量，一个`buffer`的`capacity`不会为负数并且不会变化
 >
-> 一个buffer的`limit`指第一个不应该被读或写的元素索引，一个buffer的`limit`不会为负数并且不会大于`capacity`
+> 一个`buffer`的`limit`指第一个不应该被读或写的元素索引，一个`buffer`的`limit`不会为负数并且不会大于`capacity`
 >
-> 一个buffer的`position`指下一个将被读或写的元素索引。一个buffer的`position`不会为负数并且不会大于`limit`
+> 一个`buffer`的`position`指下一个将被读或写的元素索引。一个`buffer`的`position`不会为负数并且不会大于`limit`
 
 - 比如创建一个大小为`10`的`ByteBuffer`对象，初始时`position=0`，`limit`和`capacity`为`10`
 
@@ -85,13 +85,13 @@
 >
 > 每个子类都定义了两类`get`和`put`操作
 >
-> 相对操作：从当前`position`开始根据传入的元素个数增加`position`位置，读或写一个或多个元素。如果所要求的转换超过了`limit`大小，那么相对的get操作会抛出`BufferUnderflowException`异常，相对的put操作会抛出`BufferOverflowException`异常，无论哪种情况，都没有数据传输
+> 相对操作：从当前`position`开始根据传入的元素个数增加`position`位置，读或写一个或多个元素。如果所要求的转换超过了`limit`大小，那么相对的get操作会抛出`BufferUnderflowException`异常，相对的`put`操作会抛出`BufferOverflowException`异常，无论哪种情况，都没有数据传输
 >
-> 绝对操作：接收一个显示的元素索引，不会影响`position`，如果操作的元素索引超出了limit大小，那么get或put操作会抛出`IndexOutOfBoundsException`异常
+> 绝对操作：接收一个显示的元素索引，不会影响`position`，如果操作的元素索引超出了`limit`大小，那么`get`或`put`操作会抛出`IndexOutOfBoundsException`异常
 >
-> 数据还可以通过恰当的IO通道这种操作来输入或者从`buffer`输出，它总是相对于当前的`position`。
+> 数据还可以通过恰当的`IO`通道这种操作来输入或者从`buffer`输出，它总是相对于当前的`position`。
 >
-> 一个buffer的mark表示当`reset()`方法被调用时它的`position`会被重置到那个索引位置。如果`mark`定义了，当position或者limit调节到比`mark`小的值时，`mark`会被丢弃。如果`mark`没有定义，但调用了`reset()`方法，就会抛出`InvalidMarkException`异常。
+> 一个`buffer`的`mark`表示当`reset()`方法被调用时它的`position`会被重置到那个索引位置。如果`mark`定义了，当`position`或者`limit`调节到比`mark`小的值时，`mark`会被丢弃。如果`mark`没有定义，但调用了`reset()`方法，就会抛出`InvalidMarkException`异常。
 
 - **`0 <= mark <= position <= limit <= capacity`**
 
@@ -105,7 +105,7 @@
 >
 > `rewind()`让一个`buffer`准备好重新读它已经包含的数据，它会将`limit`保持不变，将`position`设置为0。
 >
-> 每个`buffer`都是可读的，但不是每个buffer都是可写的，每个buffer的可变方法都被指定为可选操作。如果在只读`buffer`上调用写方法会抛出`ReadOnlyBufferException`异常。只读buffer不允许内容发生改变，但它的`mark`、`position`、`limit`值是可以变化的，无论一个`buffer`只读与否，都可以通过`isReadOnly()`方法来判断。
+> 每个`buffer`都是可读的，但不是每个`buffer`都是可写的，每个buffer的可变方法都被指定为可选操作。如果在只读`buffer`上调用写方法会抛出`ReadOnlyBufferException`异常。只读`buffer`不允许内容发生改变，但它的`mark`、`position`、`limit`值是可以变化的，无论一个`buffer`只读与否，都可以通过`isReadOnly()`方法来判断。
 >
 > `buffer`不是线程安全的，如果buffer在多线程中使用，需要进行同步操作
 >
@@ -161,9 +161,9 @@
 
 - 如果使用`DirectByteBuffer`，就不会在堆上分配数组，而是直接在操作系统中分配。就少了一次数据拷贝的过程。
 
-- 为何操作系统不直接访问java堆上的数据，而要拷贝到堆外：操作系统在内核态是可以访问任何一块内存区域的，如果访问堆，会通过JNI方式来访问，内存地址确定了，才能根据地址访问。但如果访问时，发生了GC，可能碰到标记-压缩，压缩后对象地址就发生了变化，再访问就出问题了。如果不GC，有可能会发生`OutOfMemoryError`。如果让对象位置不移动，也不可行。所以不能直接访问java堆上的数据
+- 为何操作系统不直接访问`java`堆上的数据，而要拷贝到堆外：操作系统在内核态是可以访问任何一块内存区域的，如果访问堆，会通过`JNI`方式来访问，内存地址确定了，才能根据地址访问。但如果访问时，发生了`GC`，可能碰到标记-压缩，压缩后对象地址就发生了变化，再访问就出问题了。如果不`GC`，有可能会发生`OutOfMemoryError`。如果让对象位置不移动，也不可行。所以不能直接访问`java`堆上的数据
 
-- 进行IO操作时，IO速度相对较慢，将堆上数据拷贝到操作系统相对较快(JVM保证拷贝时不会GC)，所以是可行的。
+- 进行`IO`操作时，`IO`速度相对较慢，将堆上数据拷贝到操作系统相对较快(`JVM`保证拷贝时不会`GC`)，所以是可行的。
 
 ### java.nio.MappedByteBuffer
 
@@ -242,9 +242,9 @@
 
   - 四次切换、四次数据拷贝
 
-  <img src="img/zero_copy_1.png" style="zoom:80%;" />
+     <img src="img/zero_copy_1.png" style="zoom:80%;" />
 
-- 
+- 改进
 
   1. 用户向`kernel`发送`sendfile()`系统调用，切换到内核模式，`kernel`通过`DMA(direct memeory access`)方式将数据从硬盘拷贝到`kernel buffer`中
   2. `kernel`将数据写到`target socket buffer`中，从其中发送数据
@@ -253,13 +253,13 @@
   - 没有内核空间与用户空间之间的数据拷贝，但内核空间中存在数据拷贝(`kernel buffer --> target socket buffer`)
   - 两次数据拷贝
 
-  <img src="img/zero_copy_2.png" style="zoom:80%;" />
+     <img src="img/zero_copy_2.png" style="zoom:80%;" />
 
-- 
+- 改进
 
   1. 用户向`kernel`发送`sendfile()`系统调用，切换到内核模式，`kernel`通过`DMA(direct memeory access`)方式将数据从硬盘拷贝到`kernel buffer`中，还可以通过`scatter/gather DMA`方式将数据读取到`kernel buffer`中
 
-  <img src="img/zero_copy_3.png" style="zoom: 80%;" />
+     <img src="img/zero_copy_3.png" style="zoom: 80%;" />
 
 - 零拷贝
 
@@ -281,7 +281,9 @@
         EventLoopGroup bossGroup = new NioEventLoopGroup();
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         try {
-            ServerBootstrap serverBootstrap = new ServerBootstrap();        			        serverBootstrap.group(bossGroup,workerGroup).channel(NioServerSocketChannel.class)
+            ServerBootstrap serverBootstrap = new ServerBootstrap(); 
+	    serverBootstrap.group(bossGroup,workerGroup)
+                    .channel(NioServerSocketChannel.class)
                     .handler(new LoggingHandler(LogLevel.INFO))
                     .childHandler(new MyServerInitializer());
             ChannelFuture channelFuture = serverBootstrap.bind(8899).sync();
@@ -332,8 +334,8 @@
 	 * 例
 	 */
 	public NioEventLoopGroup() {
-        this(0);
-    }
+        	this(0);
+    	}
 
 	/**
 	 * 使用指定的线程数、java.util.concurrent.ThreadFactory以及java.nio.channels.spi.
@@ -341,19 +343,20 @@
 	 *
 	 */
 	public NioEventLoopGroup(int nThreads) {
-        this(nThreads, (Executor) null);
-    }
+        	this(nThreads, (Executor) null);
+    	}
 
 	// ...
     
 	// 构造方法中nThreads的取值：nThreads == 0 ? DEFAULT_EVENT_LOOP_THREADS : nThreads
 	// 其父类MultithreadEventLoopGroup中设置DEFAULT_EVENT_LOOP_THREADS如下：
 	private static final int DEFAULT_EVENT_LOOP_THREADS;
-    static {
-        // 如果没有配置io.netty.eventLoopThreads，就取 系统核数 * 2，否则取配置的数量，最小取1
-        DEFAULT_EVENT_LOOP_THREADS = Math.max(1, SystemPropertyUtil.getInt(
-                "io.netty.eventLoopThreads", NettyRuntime.availableProcessors() * 2));
-    }
+    	static {
+        	// 如果没有配置io.netty.eventLoopThreads，就取 系统核数 * 2，否则取配置的数量，最小取1
+        	DEFAULT_EVENT_LOOP_THREADS = Math.max(1, SystemPropertyUtil.getInt(
+                	"io.netty.eventLoopThreads", NettyRuntime.availableProcessors() * 2)
+		);
+   	 }
 	// 最终会执行MultithreadEventExecutorGroup抽象类中的构造方法，
 	// NioEventLoopGroup继承自MultithreadEventLoopGroup抽象类，
 	// MultithreadEventLoopGroup继承自MultithreadEventExecutorGroup抽象类，
@@ -428,7 +431,7 @@
 > }
 > ```
 
-#####`io.netty.channel.socket.nio.NioServerSocketChannel`
+##### `io.netty.channel.socket.nio.NioServerSocketChannel`
 
 > 是`io.netty.channel.socket.ServerSocketChannel`的一个实现，它使用了`NIO`的`selector`的实现来接收新的连接
 
