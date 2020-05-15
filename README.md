@@ -273,7 +273,25 @@
 
 ### 源码分析
 
-
+```java
+    /**
+     * 启动流程
+     */
+	public static void main(String[] args) throws InterruptedException {
+        EventLoopGroup bossGroup = new NioEventLoopGroup();
+        EventLoopGroup workerGroup = new NioEventLoopGroup();
+        try {
+            ServerBootstrap serverBootstrap = new ServerBootstrap();        			        serverBootstrap.group(bossGroup,workerGroup).channel(NioServerSocketChannel.class)
+                    .handler(new LoggingHandler(LogLevel.INFO))
+                    .childHandler(new MyServerInitializer());
+            ChannelFuture channelFuture = serverBootstrap.bind(8899).sync();
+            channelFuture.channel().closeFuture().sync();
+        } finally {
+            bossGroup.shutdownGracefully();
+            workerGroup.shutdownGracefully();
+        }
+    }
+```
 
 #### `io.netty.util.concurrent.EventExecutorGroup`
 
@@ -432,42 +450,50 @@
 
 - 其父类`AbstractBootstrap`类中的`bind`方法
 
-> 创建一个新的`Channel`并绑定它
->
 > ```java
+> // 创建一个新的Channel并绑定它
 > public ChannelFuture bind(int inetPort) {
 >     return bind(new InetSocketAddress(inetPort));
 > }
 > 
+> // 创建一个新的Channel并绑定它
 > public ChannelFuture bind(SocketAddress localAddress) {
 >     // ...
 >     return doBind(localAddress);
 > }
 > 
 > private ChannelFuture doBind(final SocketAddress localAddress) {
+>     // 初始化并绑定channel，返回其异步执行的结果：ChannelFuture
 >     final ChannelFuture regFuture = initAndRegister();
 >     final Channel channel = regFuture.channel();
+>     // cause()：返回IO操作失败的原因
 >     if (regFuture.cause() != null) {
 >         return regFuture;
 >     }
+>     // isDone()：返回任务是否已完成，任务可能正常结束、可能发生异常、也可能被取消
 >     if (regFuture.isDone()) {
->         // At this point we know that the registration was complete and successful.
+>         // 进入判断就肯定任务已经完成了
+>         // 返回一个新的io.netty.channel.ChannelPromise，ChannelPromise是一种
+>         // 可写的特殊的ChannelFuture
 >         ChannelPromise promise = channel.newPromise();
+>         // 调用doBind0()进行绑定，如果initAndRegister()执行成功(通过regFuture判断)，就
+>         // 给channel绑定localAddress，并添加监听器ChannelFutureListener.CLOSE_ON_FAILURE
+>         // 如果失败，就将原因写入到ChannelPromise中(ChannelPromise就是可写的ChannelFuture)
 >         doBind0(regFuture, channel, localAddress, promise);
 >         return promise;
 >     } else {
->         // Registration future is almost always fulfilled already, but just in case it's not.
+>         // 注册的future几乎已经完成了,但以防万一
 >         final PendingRegistrationPromise promise = new PendingRegistrationPromise(channel);
 >         regFuture.addListener(new ChannelFutureListener() {
 >             @Override
 >             public void operationComplete(ChannelFuture future) throws Exception {
 >                 Throwable cause = future.cause();
 >                 if (cause != null) {
->                     // Registration on the EventLoop failed so fail the ChannelPromise directly to not cause an
->                     // IllegalStateException once we try to access the EventLoop of the Channel.
+>                     // 在EventLoop中注册失败，因此在访问Channel的EventLoop时，
+>                     // ChannelPromise不能直接导致IllegalStateException
 >                     promise.setFailure(cause);
 >                 } else {
->                     // Registration was successful, so set the correct executor to use.
+>                     // 注册操作已完成, 所以设置正确的执行器去使用
 >                     // See https://github.com/netty/netty/issues/2586
 >                     promise.registered();
 >                     doBind0(regFuture, channel, localAddress, promise);
@@ -477,13 +503,157 @@
 >         return promise;
 >     }
 > }
+> 
+> 
+> final ChannelFuture initAndRegister() {
+>     Channel channel = null;
+>     try {
+>         // 这里的channelFactory是io.netty.channel.ReflectiveChannelFactory类型
+>         // 通过反射创建io.netty.channel.socket.nio.NioServerSocketChannel实例
+>         channel = channelFactory.newChannel();
+>         // 调用ServerBootStrap中的init()方法初始化channel：
+>         // 	1. 给channel设置options，options为LinkedHashMap类型
+>         //	2. 给channel设置attrs，attrs也是LinkedHashMap类型
+>         //	3. 判断channel的pipeline中是否添加了handler，如果添加了就把handler添加到
+>         //		管道的最后
+>         // 	4. 往管道中添加一个ServerBootstrapAcceptor
+>         init(channel);
+>     } catch (Throwable t) {
+>         if (channel != null) {
+>             channel.unsafe().closeForcibly();
+>         }
+>         return new DefaultChannelPromise(channel, GlobalEventExecutor.INSTANCE).setFailure(t);
+>     }
+>     // config()：ServerBootstrapConfig
+>     // group()：NioEventLoopGroup
+>     // register()：将channel注册到NioEventLoopGroup中，注册完成时ChannelFuture收到通知
+>     ChannelFuture regFuture = config().group().register(channel);
+>     // cause()：返回IO操作失败的原因
+>     if (regFuture.cause() != null) {
+>         if (channel.isRegistered()) {
+>             channel.close();
+>         } else {
+>             channel.unsafe().closeForcibly();
+>         }
+>     }
+>     // 如果到这里，就说明操作成功了，就是以下情况之一：
+>     // 1) 如果我们尝试从事件循环中注册，那么此时注册已经完成了，也就是说，现在调用bind()方法和
+>     //		connect()方法时安全的，因为channel已经被注册了
+>     // 2) 如果我们尝试从其他的线程中注册, 那么注册的请求已经成功添加到事件循环后续执行的任务队列中
+>     //		也就是说调用bind()方法和connect()方法是安全的，因为bind()方法和connect()方法会在
+>     //		已经计划的注册操作之后被执行，因为register()、bind()、connect()方法一定会在同一个
+>     //		线程中
+>     return regFuture;
+> }
 > ```
 
 #### `io.netty.channel.ChannelFuture`
 
 - `io.netty.channel.ChannelFuture`接口继承了`io.netty.util.concurrent.Future`，它又继承了`java.util.concurrent.Future`接口
 
-##### `java.util.concurrent.Future`
+> 表示一个异步`io.netty.channel.Channel` `IO`操作的执行结果
+>
+> `netty`中所有的`IO`操作都是异步的，这说明所有的`IO`调用会立即返回，但返回后并不保证所请求的`IO`操作已经完成了，相反，你会得到一个`ChannelFuture`的实例，它会给你一些`IO`操作的结果和状态信息
+>
+> 一个`ChannelFuture`要么是`uncompleted`，要么是`completed`，当`IO`操作开始时，会创建一个新的`future`，这个新的`future`对象初始时是`uncompleted`的，既不是成功的，也不是失败的，也不是取消的，因为`IO`操作是尚未完成的，如果`IO`操作完成了，要么是成功了，要么失败了，或者取消了，那么`future`就会标识为`completed`，并且携带一些信息，比如失败的原因。请注意，失败和取消都属于完成(`completed`)的状态
+>
+> ```java
+>                                      +---------------------------+
+>                                      | Completed successfully    |
+>                                      +---------------------------+
+>                                 +---->      isDone() = true      |
+> +--------------------------+    |    |   isSuccess() = true      |
+> |        Uncompleted       |    |    +===========================+
+> +--------------------------+    |    | Completed with failure    |
+> |      isDone() = false    |    |    +---------------------------+
+> |   isSuccess() = false    |----+---->      isDone() = true      |
+> | isCancelled() = false    |    |    |       cause() = non-null  |
+> |       cause() = null     |    |    +===========================+
+> +--------------------------+    |    | Completed by cancellation |
+>                                 |    +---------------------------+
+>                                 +---->      isDone() = true      |
+>                                      | isCancelled() = true      |
+>                                      +---------------------------+
+> ```
+>
+> `ChannelFuture`提供了非常多的方法让你去检查`IO`操作是否完成了，还是在等待完成，然后获取`IO`操作的结果。也允许你添加`io.netty.channel.ChannelFutureListener`，这样在`IO`操作完成时就可以收到通知
+>
+> 建议使用`addListener(GenericFutureListener)`方法，而不使用`await()`方法
+>
+> 任何可能情况下，当`IO`操作完成时建议使用`addListener(GenericFutureListener)`而不是用`await()`获取通知，然后去做任何后续的任务。
+>
+> `addListener(GenericFutureListener)`是一个非阻塞的方法，它只是将指定的`io.netty.channel.ChannelFutureListener`添加到`ChannelFuture`中，当与`IO`操作关联的`future`完成时，`IO`线程就会通知`listener`，`ChannelFutureListener`会产生最好的性能和资源利用率，因为它一点都不会阻塞，但如果你对事件驱动编程不了解就可能在实现顺序逻辑时比较棘手
+>
+> 与之相反，`await()`是一个阻塞操作，一旦调用，调用者线程就会阻塞直到操作完成，`await()`实现一个顺序逻辑比较容易，但调用者线程会没必要的阻塞直到`IO`操作完成，`inter-thread`的通知成本也更高，此外，在特定情况也可能出现死锁的情况，就像下面所描述的
+>
+> 不要在`io.netty.channel.ChannelHandler`内部调用`await()`
+>
+> `ChannelHandler`中的事件处理的方法通常由`IO`线程调用，如果事件处理的方法调用了`await()`方法，而事件处理的方法由`IO`线程调用，那么`IO`操作可能永远不会完成，因为`await()`方法会阻塞`IO`操作，这种情况就造成死锁
+>
+> ```java
+> // 不好的例子
+> public void channelRead(ChannelHandlerContext ctx, Object msg){
+>     ChannelFuture future = ctx.channel().close();
+>     future.awaitUninterruptibly();
+>     // Perform post-closure operation
+>     // ...
+> }
+> 
+> // 好的例子
+> public void channelRead(ChannelHandlerContext ctx, Object msg) {
+>     ChannelFuture future = ctx.channel().close();
+>     future.addListener(new  ChannelFutureListener() {
+>         public void operationComplete(ChannelFuture future) {
+>             // Perform post-closure operation
+>             // ...
+>         }
+>     });
+> }
+> ```
+>
+> 尽管上面提到有这些缺陷，某些情况下调用`await()`方法更加方便，在这种情况下，请确保不会在`IO`线程中调用`await()`方法，否则，会抛出`BlockingOperationException`异常来防止死锁
+>
+> 不要将`IO`超时和等待超时混为一谈
+>
+> `await(long)`、`await(long, TimeUnit)`、`awaitUninterruptibly(long)`、`awaitUninterruptibly(long, TimeUnit)`方法所指定的超时的值与`IO`超时没有任何关系。如果一个`IO`操作超时，那么`future`会被标记为失败，比如说，连接超时应该通过`transport-specific`选项来配置：
+>
+> ```java
+> // 不好的例子
+> Bootstrap b = ...;
+> ChannelFuture f = b.connect(...);
+> f.awaitUninterruptibly(10, TimeUnit.SECONDS);
+> if (f.isCancelled()) {
+>     // ...
+> } else if (!f.isSuccess()) {
+>     // 连接失败，
+>     // 原因可能是future还没有完成所以发生了NullPointerException
+>     // 也可能是连接超时，这里一块处理了
+>     f.cause().printStackTrace();
+> } else {
+>     // 连接成功...
+> }
+> 
+> // 好的例子
+> Bootstrap b = ...;
+> // 配置连接超时
+> b.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000);
+> ChannelFuture f = b.connect(...);
+> f.awaitUninterruptibly();
+> // 现在可以确保future已经完成了
+> assert f.isDone();
+> if (f.isCancelled()) {
+>     // ...
+> } else if (!f.isSuccess()) {
+>     // 处理连接失败的原因，与上面的连接超时分开处理
+>     f.cause().printStackTrace();
+> } else {
+>     // 连接成功...
+> }
+> ```
+
+##### `Channel channel()`
+
+> 返回一个`Channel`，这个`Channel`是与`future`相关的`IO`操作的`Channel`
 
 > 一个`Future`代表一个异步计算的结果。`Future`提供了一些方法来检查计算是否完成了，还有些方法会等待计算的完成，还有些方法用来获取计算的结果。当计算完成时，计算的结果只能通过`get()`方法获取，计算完成之前`get()`方法会阻塞。取消操作是通过`cancle()`方法来完成的。此外`Future`还提供了附加的方法来确定任务是正常完成还是取消掉了。一旦计算完成，就不能被取消了。如果你想以取消为目的用了`Future`，但又没有提供一个可用的结果，你就可以声明这种形式的的`Future`，返回`null`作为它底层任务的结果。
 >
@@ -545,7 +715,32 @@
 
 ##### `io.netty.util.concurrent.Future`
 
-###### `Future<V> removeListener(GenericFutureListener<? extends Future<? super V>> listener)`
+###### `boolean isSuccess()`
+
+> 当且仅当`IO`操作完成了就返回`true`
+
+###### `boolean isCancellable()`
+
+> 当且仅当操作可以通过`cancel(boolean)`方法取消时返回`true`
+
+###### `Throwable cause()`
+
+> 如果`IO`操作失败了，就会返回失败的原因
+
+###### `Future<V> addListener(GenericFutureListener<? extends Future<? super V>> listener)`
 
 > 给`Future`添加指定的`listener`，当`Future`的`isDone()`方法完成时，`listener`就会收到通知，如果`future`已经了，指定的`listener`就会立刻被通知到
 
+###### `Future<V> sync() throws InterruptedException`
+
+> 等待`future`直到它完成，如果`future`失败会重新抛出失败的原因
+
+###### `Future<V> await() throws InterruptedException`
+
+> 等待`future`的完成
+
+###### `V getNow()`
+
+> 不阻塞的返回结果，如果`future`尚未完成，这个方法就返回`null`。
+>
+> 由于`null`值可能作为结果标识`future`的成功，所以还需要通过`isDone()`判断`future`是否真的完成了，不要依赖于`null`值
