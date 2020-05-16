@@ -6,7 +6,7 @@
 
 #### 设计
 
-- 针对各种传输类型设计了一个统一的API，无论是阻塞的还是非阻塞的socket。
+- 针对各种传输类型设计了一个统一的API，无论是阻塞的还0是非阻塞的socket。
 
 - 基于一种灵活的并且可扩展的事件模型，可进行关注点分离
 
@@ -85,19 +85,19 @@
 >
 > 每个子类都定义了两类`get`和`put`操作
 >
-> 相对操作：从当前`position`开始根据传入的元素个数增加`position`位置，读或写一个或多个元素。如果所要求的转换超过了`limit`大小，那么相对的get操作会抛出`BufferUnderflowException`异常，相对的`put`操作会抛出`BufferOverflowException`异常，无论哪种情况，都没有数据传输
+> 相对操作：从当前`position`开始根据传入的元素个数增加`position`位置，读或写一个或多个元素。如果所要求的转换超过了`limit`大小，那么相对的`get`操作会抛出`BufferUnderflowException`异常，相对的`put`操作会抛出`BufferOverflowException`异常，无论哪种情况，都没有数据传输
 >
 > 绝对操作：接收一个显示的元素索引，不会影响`position`，如果操作的元素索引超出了`limit`大小，那么`get`或`put`操作会抛出`IndexOutOfBoundsException`异常
 >
 > 数据还可以通过恰当的`IO`通道这种操作来输入或者从`buffer`输出，它总是相对于当前的`position`。
 >
-> 一个`buffer`的`mark`表示当`reset()`方法被调用时它的`position`会被重置到那个索引位置。如果`mark`定义了，当`position`或者`limit`调节到比`mark`小的值时，`mark`会被丢弃。如果`mark`没有定义，但调用了`reset()`方法，就会抛出`InvalidMarkException`异常。
+> 一个`buffer`的`mark`表示当`reset()`方法被调用时它的`position`会被重置到哪个索引位置。`mark`标记不一定总会被定义，但如果定义了`mark`，`mark`就不能为负数或者大于`position`。如果`mark`定义了，当`position`或者`limit`调节到比`mark`小的值时，`mark`会被丢弃。如果`mark`没有定义，但调用了`reset()`方法，就会抛出`InvalidMarkException`异常。
 
 - **`0 <= mark <= position <= limit <= capacity`**
 
-> 一个新创建的`buffer`，它的`position`值总是为0，`mark`值是未定义的。`limit`值可能是0，也可能是其他值，取决于`buffer`构建的方式，新分配的`buffer`它的每个值都是0
+> 一个新创建的`buffer`，它的`position`值总是为0，`mark`值是未定义的。`limit`值可能是0，也可能是其他值，取决于`buffer`构建的方式，新分配的`buffer`它的每个元素都是0
 >
-> 除了访问`position`，`limit`，`capacity`值及重置`mark`值之外，这个类还定义了如下操作
+> 除了访问`position`、`limit`、`capacity`值及重置`mark`值之外，这个类还定义了如下操作
 >
 > `clear()`让一个`buffer`准备好一个新的通道的读或者相对的`put()`操作，它会将`limit`设为`capacity`的值，将`position`设为0。
 >
@@ -105,11 +105,25 @@
 >
 > `rewind()`让一个`buffer`准备好重新读它已经包含的数据，它会将`limit`保持不变，将`position`设置为0。
 >
-> 每个`buffer`都是可读的，但不是每个`buffer`都是可写的，每个buffer的可变方法都被指定为可选操作。如果在只读`buffer`上调用写方法会抛出`ReadOnlyBufferException`异常。只读`buffer`不允许内容发生改变，但它的`mark`、`position`、`limit`值是可以变化的，无论一个`buffer`只读与否，都可以通过`isReadOnly()`方法来判断。
+> 每个`buffer`都是可读的，但不是每个`buffer`都是可写的，每个`buffer`的可变方法都被指定为可选操作，如果在只读`buffer`上调用写方法会抛出`ReadOnlyBufferException`异常。只读`buffer`不允许内容发生改变，但它的`mark`、`position`、`limit`值是可以变化的，无论一个`buffer`只读与否，都可以通过`isReadOnly()`方法来判断。
 >
-> `buffer`不是线程安全的，如果buffer在多线程中使用，需要进行同步操作
+> `buffer`不是线程安全的，如果`buffer`在多线程中使用，需要进行合适的同步操作
 >
-> 这个类中的方法，如果没有指定返回值，那么会返回这个`buffer`本身。这就允许方法可以链接起来，比如：`b.flip();b.position(23);b.limit(42)`可以被`b.flip().position(23).limit(42)`替代。
+> 这个类中的方法，如果没有指定返回值，那么会返回这个`buffer`本身。这就允许方法可以链接起来，比如：
+>
+> ```java
+> b.flip();
+> b.position(23);
+> b.limit(42)
+> ```
+>
+> 可以被
+>
+> ```java
+> b.flip().position(23).limit(42)
+> ```
+>
+> 替代
 
 #### 零拷贝
 
@@ -172,48 +186,68 @@
 
 > 一个`direct byte buffer`，内容是一个文件的内存映射区域(`memory-mapped region`)
 >
-> `MappedByteBuffer`可以通过`java.nio.channels.FileChannel.map()`创建
+> `MappedByteBuffer`可以通过`java.nio.channels.FileChannel.map()`创建，它继承了`ByteBuffer`，它操作都是特定于内存映射的文件区域
 >
 > 一个`mapped byte buffer`以及它所代表的文件映射在`buffer`本身被垃圾回收前一直有效
 >
-> `mapped byte buffer`的内容随时可以更改。
+> `mapped byte buffer`的内容随时可以更改，比如说，如果一个映射文件的区域里对应的内容被另外的程序修改了，不管是否发生了这种改变，或者何时发生，都是依赖于操作系统的，因此是未指定的
+>
+> 一个`mapped byte buffer`的所有部分也可能是在任何时候都无法访问的，比如映射文件被删除了。尝试访问一个不可访问的`mapped byte buffer`区域不会改变该`buffer`的内容，但会在访问时或访问之后造成一种未指定的异常。因此强烈建议除了读或写文件的内容之外，采取合适的预防措施避免这个程序操控内存映射文件，或者同时运行程序。
+>
+> 在其他方面，`mapped byte buffer`与普通直接字节内存行为上没什么不同
 
 ### java.nio.channels.Selector
 
-> 是一个双工的`java.nio.channels.SelectableChannel`对象
+> 是一个多路复用的`java.nio.channels.SelectableChannel`对象
 >
 > `selector`可以通过调用这个类的`open()`方法来创建，`open()`会使用系统默认的`java.nio.channels.spi.SelectorProvider`选择器提供者来创建新的`selector`，`selector`也可以通过一个自定义的`selector`提供者调用`java.nio.channels.spi.SelectorProvider.openSelector()`方法来创建，一个`selector`在调用它的`close()`方法之前会一直处于`open`状态
 >
-> 一个可选择的`channel`注册到`selector`上是通过`SelectionKey`对象来表示的，一个`selector`维护三个`selection key`集合：
+> 一个可选择的`channel`注册到`selector`上是通过`java.nio.channels.SelectionKey`对象来表示的，一个`selector`维护三个`selection key`集合：
 >
 > - `key set`：它包含的`key`表示当前`selector`上注册的`channel`，这个集合通过`keys()`方法返回
-> - `selected-key set`：这个集合通过`selectedKeys()`方法返回，它永远是`key set`的一个子集
+> - `selected-key set`：它表示每个`key`的`channel`在`key`的兴趣集中检测到至少一个操作准备就行，这个集合通过`selectedKeys()`方法返回，它永远是`key set`的一个子集
 > - `cancelled-key  set`：它表示`key`已经被取消了，但`channel`还没被取消，这个集合不能直接访问。`cancelled-key set`也永远是`key set`的一个子集。
 >
-> 在一个新的`selector`新创建时，这三个集合都是空的
+> 在一个新的`selector`创建时，这三个集合都是空的
 >
-> 一个`key`被添加到`selector`的`key set`中是作为通过`SelectableChannel.register(Selector,int)`方法注册一个`channel`的副作用(就是说注册`channel`就会把`key`添加到`selector`中)，在`selection`操作中`cancelled key`会从`key set`中移除。`key set`本身是不能直接被修改的。
+> 一个`key`被添加到`selector`的`key set`中是作为通过`SelectableChannel.register(Selector,int)`方法注册一个`channel`的副作用(就是说注册`channel`就会把`key`添加到`selector`中)，`cancelled key`是在`selection`操作期间从`key set`中移除的`key`。`key set`本身是不能直接被修改的。
 >
-> 一个`key`当它被取消时，它会被添加到它的`selector`的`cancelled-key set`中，无论是通过关闭它的`channel`还是调用`SelectionKey.cancel()`方法。取消一个`key`会导致在下次`selection`操作中它的`channel`会被取消注册，此时这个`key`会从`selector`的所有`key`集合中移除掉。
+> 当一个`key`被取消时，它会被添加到它的`selector`的`cancelled-key set`中，无论是通过关闭它的`channel`还是调用`SelectionKey.cancel()`方法。取消一个`key`会导致在下次`selection`操作中它的`channel`会被取消注册，此时这个`key`会从`selector`的所有`key`集合中移除掉。
 >
-> 通过`selection`操作，`key`会被添加到`selected-key set`中，一个`key`可能通过调用这个`set`的`java.util.Set.remove(java.lang.Object)`方法或者根据这个`set`获得的`iterator`的`java.util.Iterator.remove()`方法直接从`set`中移除。`key`不会以任何其他的方式从`selected-key set`中移除。
+> 通过`selection`操作，`key`会被添加到`selected-key set`中，一个`key`可能通过调用这个`set`的`java.util.Set.remove(java.lang.Object)`方法或者根据这个`set`获得的`iterator`的`java.util.Iterator.remove()`方法直接从`set`中移除。`key`不会以任何其他的方式从`selected-key set`中移除。特别是，它们不会作为`selection`操作的副作用而被删除。
 >
 > 在每一个`selection`操作中，`key`可能被添加到一个`selector`的`selected-key set`中或者从`selector`的`selected-key set`中移除，也可能从`cancelled-key set`中移除，`selection`操作是通过`select()`、`select(long)`、`selectNow()`等方法来执行的，分为三个步骤：
 >
-> - 在`cancelled-key set`中的每个`key`都会从`set`中被移除掉，它的`channel`会被取消注册，这个步骤使得`cancelled-key set`变为空集合
+> - 在`cancelled-key set`中的每个`key`都会从每个`set`中被移除掉，它的`channel`会被取消注册，这个步骤使得`cancelled-key set`变为空集合
 >
-> - 在`selection`操作开始时，底层的操作系统会查询是否更新未被取消注册的`channel`的准备状况，执行任何我们的感兴趣的操作，对于准备有至少一个操作的`channel`，如下两个动作会被执行：
+> - 在`selection`操作开始时，底层的操作系统会查询是否更新未被取消注册的`channel`的准备状况，执行任何我们的感兴趣的操作，对于准备有至少一个这样操作的`channel`来说，如下两个动作会执行：
 >
 >   - 如果`channel`的`key`不在`selected-key set`中，它会被添加到`set`中，它的`ready-operation set`会被修改以精确地表示`channel`已经报告准备好的这些`operation`，任何之前记录的准备信息会被丢弃掉。
 >   - 如果`channel`的`key`已在`selected-key set`中，它的`ready-operation set`会被修改以便标识`channel`已经报告准备好的任何新的操作。之前所记录的准备信息会被保留下来，换句话说，由操作系统返回的准备集合会按位的方式放到`key`的当前的准备集合中。
 >
->   如果`key set`中所有的`key`在这个步骤开始时没有感兴趣的集合，那么`selected-key  set`或者任何`key`的`ready-operation`都不会被更新
+>   如果`key set`中所有的`key`在这个步骤开始时没有感兴趣的集合，那么`selected-key  set`或者任何`key`的`ready-operation`都不会被更新s
 >
 > - 如果在步骤2中有任何`key`被添加到`cancelled-key set`中，那么它们会在步骤1中被处理
 >
-> 无论一个`selection`操作是否阻塞的等待一个或多个通道变得可用，如果是，等待多长时间，这是这三个`selection`方法的本质区别。
+> 无论一个`selection`操作是否阻塞的等待一个或多个`channel`变得可用，如果是，等待多长时间，这是这三个`selection`方法的本质区别。
 >
-> 一个`selector`的`key`和`selected-key set`在多线程并发中使用通常不是安全的，如果一个线程直接修改集合中的一个，那么这个访问要通过`set`本身做一个同步。由`set`的`java.util.Set.iterator()`方法所返回的`iterator`是快速失败的，如果在`iterator`创建后`set`被修改了，处理调用`iterator`自己的`java.util.Iterator.remove()`方法之外，任何其他修改都会导致`java.util.ConcurrentModificationException`
+> 多线程环境下使用，`Selector`本身是安全的，但`key set`不是线程安全的
+>
+> `selection`操作同步在`selector`上，在`key set`上，也同步在`selected-key set`上，在上面的三个步骤中，也同步在`cancelled-key`上
+>
+> 当一个`selection`操作在执行时，修改`selector`的`key`的感兴趣的集合对这个操作是没有影响的，这个修改在下个`selection`操作中可见
+>
+> `key`可能在任何时候被取消，`channel`也可能在任何时候被关闭，因此在`selector`的一个或多个`key set`中存在键并不意味着`key`有效或者`channel`是打开的。应用程序应该注意同步，如果有其他可能的线程取消一个`key`或者关闭`channel`，必要时要检查这种情况
+>
+> 在`java.nio.channels.Selector#select()`方法或者`java.nio.channels.Selector#select(long)`方法中阻塞的线程，可能以以下三种方式之一被其他线程打断
+>
+> - 通过调用`selector`的`java.nio.channels.Selector#wakeup`方法
+> - 通过调用`selector`的`java.nio.channels.Selector#close`方法
+> - 通过调用阻塞线程的`java.lang.Thread#interrupt`方法，这种情况下它会被设置中断标志，`selector`的`wakeup()`方法会被调用
+>
+> 在一个`selection`操作中，`java.nio.channels.Selector#close`方法会以相同的顺序同步在`selector`和三个`key set`中
+>
+> 一个`selector`的`key`和`selected-key set`在多线程并发中使用通常不是安全的，如果一个线程直接修改集合中的一个，那么这个访问要通过`set`本身做一个同步。由`set`的`java.util.Set.iterator()`方法所返回的`iterator`是快速失败的，如果在`iterator`创建后`set`被修改了，除了调用`iterator`自己的`java.util.Iterator.remove()`方法之外，任何其他修改都会导致`java.util.ConcurrentModificationException`
 
 - `open()`
 
