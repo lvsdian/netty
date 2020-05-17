@@ -1,4 +1,4 @@
-
+[toc]
 
 ### netty概述
 
@@ -196,6 +196,16 @@
 >
 > 在其他方面，`mapped byte buffer`与普通直接字节内存行为上没什么不同
 
+### java.nio.channels.Channel
+
+> `IO`操作的连接
+>
+> 一个`channel`代表与一个实体建立连接，比如一个硬件设备，一个文件，一个网络套接字，或者一个有能力执行一个或多个不同的`IO`操作的程序组件，比如读或写
+>
+> 一个`channel`要么是打开的，要么是关闭的，一个`channel`在创建时打开，一旦关闭就永久关闭了。一旦一个`channel`关闭了，任何在它上面调用`IO`操作的尝试都会导致抛出`ClosedChannelException`，无论一个`channel`是否打开，可通过调用`isOpen()`方法来测试
+>
+> 通常，`channel`对于多线程的访问时安全的，如扩展和实现该接口的接口和类规范中所述
+
 ### java.nio.channels.Selector
 
 > 是一个多路复用的`java.nio.channels.SelectableChannel`对象
@@ -259,11 +269,52 @@
 
 > 一个代表`java.nio.channels.SelectableChannel`注册到`java.nio.channels.Selector`的`token`。
 >
-> 每次一个`channel`注册到`selector`上`selection key`都会被创建，在调用它的`cancel()`方法或者关闭它的`channel`之前，这个`key`都有效。取消一个`key`，不会立马从它的`selector`中移除，而是在下次进行`selection`操作时添加到`cancelled-key set`进行移除。`key`的有效性可以通过`isValid()`方法检测
+> 每次一个`channel`注册到`selector`上`selection key`都会被创建，在调用它的`cancel()`方法或者关闭它的`channel`或者关闭它的`selector`之前，这个`key`都有效。取消一个`key`，不会立马从它的`selector`中移除，而是在下次进行`selection`操作时添加到`cancelled-key set`中进行移除。`key`的有效性可以通过`isValid()`方法检测
 >
 > 一个`selecton key`包含两个用整数表示的操作集合，每组操作集合表示`key`的`channel`支持的`selectable`操作的分类。
 >
-> - `ready set`/`interest set`
+> - `interest set`决定哪些操作分类在下次调用`selector`的`selection method`之一的方法时进行准备测试，`interest set`在创建`key`的时候，根据给定的值进行初始化，后续也可以通过`interestOps(int)`方法改变。
+> - ``ready set`标识哪些操作分类已经由`key`的`selector`检测到它的`channel`已经准备好了。`key`在创建时，`ready set`被初始化为`0`，后续可通过`selection`操作由`selector`来更新，但不能直接更新
+>
+> 一个`selection key`的`ready set`表示它的`channel`已经暗示某些操作分类已经准备好了，但不保证当一个线程执行分类中的一个操作时不会造成线程阻塞，`ready set`在`selection`操作完成后是最准确的，也可能由相应的`channel`调用外部事件、`IO`操作等变得不准确
+>
+> 这个类定义了所有已知的`operation-set`，但给定`channel`所支持的确切位取决于`channel`的类型。每一个`java.nio.channels.SelectableChannel`的子类都会定义一个`validOps()`方法，它会返回一个集合，表示这些操作能被`channel`支持，如果尝试测试一个`operation-set bit`是否被一个`key`的`channel`支持，结果会是运行时异常
+>
+> 通常有必要将特定应用的数据和一个`selection key`结合起来，比如一个对象表示一个高级协议的状态并处理准备就绪的通知以便实现这个协议，因此`selection key`支持将单个对象附加到`key`上面，一个对象可以通过`java.nio.channels.SelectionKey#attach`方法被附加，后续也可以通过`java.nio.channels.SelectionKey#attachment`方法获取
+>
+> `selection key`在多线程并发中使用是安全的，`interest set`的读和操作通常与`selector`的某些操作同步，这个同步如何执行是取决于它的实现：在一个简单的实现中，如果`selection`操作正在执行，读或写一个`interest set`的操作会被无限期的阻塞；在一个高性能的实现中，如果发生同样情况，读或写一个`interest set`的操作会被短暂阻塞。在任何情况下，一个`selection`操作都会用`interest-set`的值作为开始时刻的当前值
+
+#### `SelectableChannel channel()`
+
+> 返回创建这个`key`的`channel`，后续如果`key`被取消了，这个方法依旧会返回这个`channel`
+
+#### `Selector selector()`
+
+> 返回创建这个`key`的`selector`，后续如果`key`被取消了，这个方法依旧会返回这个`selector`
+
+#### `boolean isValid()`
+
+> 辨别这个`key`是否有效，`key`在创建之后，直到它被取消，或者`channel`被关闭，，或者`selector`被关闭之前都是有效的
+
+#### `void cancel()`
+
+> 请求取消这个`key`的`channel`与它的`selector`的注册，返回后`key`会失效，并且会加入到`selector`的`cancelled-key set`中，在下一个`selection`操作中，`key`会从`selector`的所有`key set`中移除
+>
+> 如果`key`已经取消了，再调用这个方法就没有任何作用，`key`一旦取消，就会永远失效
+>
+> 这个方法可以在任何时候被调用，它同步在`selector`的`cancelled-key set`上，因此如果同时调用同一个`selector`的取消操作或者选择操作，回发生短暂的阻塞
+
+#### `int interestOps()`
+
+> 获得这个`key`的`interest set`
+>
+> 保证返回的`set`只包含对这个`key`的`channel`有效的`operation bit`
+>
+> 这个方法可以在任何时候被调用，不论是否阻塞，阻塞多久，取决于它的实现
+
+`SelectionKey interestOps(int ops)`
+
+> 根据给定值设置`key`的`interest set`，这个方法可以在任何时候被调用，不论是否阻塞，阻塞多久，取决于它的实现
 
 ### 零拷贝
 
