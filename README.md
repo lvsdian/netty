@@ -1,4 +1,48 @@
-[toc]
+* [netty概述](#netty%E6%A6%82%E8%BF%B0)
+  * [设计](#%E8%AE%BE%E8%AE%A1)
+* [BIO](#bio)
+  * [装饰者模式](#%E8%A3%85%E9%A5%B0%E8%80%85%E6%A8%A1%E5%BC%8F)
+* [NIO](#nio)
+* [java\.nio\.Buffer](#javaniobuffer)
+  * [零拷贝](#%E9%9B%B6%E6%8B%B7%E8%B4%9D)
+* [java\.nio\.MappedByteBuffer](#javaniomappedbytebuffer)
+* [java\.nio\.channels\.Channel](#javaniochannelschannel)
+* [java\.nio\.channels\.Selector](#javaniochannelsselector)
+* [java\.nio\.channels\.SelectionKey](#javaniochannelsselectionkey)
+  * [SelectableChannel channel()](#selectablechannel-channel)
+  * [Selector selector()](#selector-selector)
+  * [boolean isValid()](#boolean-isvalid)
+  * [void cancel()](#void-cancel)
+  * [int interestOps()](#int-interestops)
+* [零拷贝](#%E9%9B%B6%E6%8B%B7%E8%B4%9D-1)
+* [源码分析](#%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90)
+  * [io\.netty\.util\.concurrent\.EventExecutorGroup](#ionettyutilconcurrenteventexecutorgroup)
+    * [EventExecutor next()](#eventexecutor-next)
+  * [io\.netty\.channel\.EventLoopGroup](#ionettychanneleventloopgroup)
+    * [EventLoop next()](#eventloop-next)
+    * [ChannelFuture register(Channel channel)](#channelfuture-registerchannel-channel)
+    * [ChannelFuture register(ChannelPromise promise)](#channelfuture-registerchannelpromise-promise)
+  * [io\.netty\.channel\.nio\.NioEventLoopGroup](#ionettychannelnionioeventloopgroup)
+  * [io\.netty\.bootstrap\.ServerBootstrap](#ionettybootstrapserverbootstrap)
+    * [group(EventLoopGroup parentGroup, EventLoopGroup childGroup)](#groupeventloopgroup-parentgroup-eventloopgroup-childgroup)
+    * [channel(Class&lt;? extends C&gt; channelClass)](#channelclass-extends-c-channelclass)
+    * [io\.netty\.channel\.socket\.nio\.NioServerSocketChannel](#ionettychannelsocketnionioserversocketchannel)
+    * [childHandler(ChannelHandler childHandler)](#childhandlerchannelhandler-childhandler)
+    * [ChannelFuture bind(int inetPort)](#channelfuture-bindint-inetport)
+  * [io\.netty\.channel\.ChannelFuture](#ionettychannelchannelfuture)
+    * [Channel channel()](#channel-channel)
+      * [get()](#get)
+      * [get(long timeout, TimeUnit unit)](#getlong-timeout-timeunit-unit)
+      * [boolean cancel(boolean mayInterruptIfRunning)](#boolean-cancelboolean-mayinterruptifrunning)
+      * [boolean isDone()](#boolean-isdone)
+    * [io\.netty\.util\.concurrent\.Future](#ionettyutilconcurrentfuture)
+      * [boolean isSuccess()](#boolean-issuccess)
+      * [boolean isCancellable()](#boolean-iscancellable)
+      * [Throwable cause()](#throwable-cause)
+      * [Future&lt;V&gt; addListener(GenericFutureListener&lt;? extends Future&lt;? super V&gt;&gt; listener)](#futurev-addlistenergenericfuturelistener-extends-future-super-v-listener)
+      * [Future&lt;V&gt; sync() throws InterruptedException](#futurev-sync-throws-interruptedexception)
+      * [Future&lt;V&gt; await() throws InterruptedException](#futurev-await-throws-interruptedexception)
+      * [V getNow()](#v-getnow)
 
 ### netty概述
 
@@ -206,6 +250,10 @@
 >
 > 通常，`channel`对于多线程的访问时安全的，如扩展和实现该接口的接口和类规范中所述
 
+#### `boolean isOpen()`
+
+> 检测这个`channel`是否是打开的
+
 ### java.nio.channels.Selector
 
 > 是一个多路复用的`java.nio.channels.SelectableChannel`对象
@@ -259,11 +307,61 @@
 >
 > 一个`selector`的`key`和`selected-key set`在多线程并发中使用通常不是安全的，如果一个线程直接修改集合中的一个，那么这个访问要通过`set`本身做一个同步。由`set`的`java.util.Set.iterator()`方法所返回的`iterator`是快速失败的，如果在`iterator`创建后`set`被修改了，除了调用`iterator`自己的`java.util.Iterator.remove()`方法之外，任何其他修改都会导致`java.util.ConcurrentModificationException`
 
-- `open()`
+#### `Selector open()`
+
+```java
+	public static Selector open() throws IOException {
+        return SelectorProvider.provider().openSelector();
+    }
+```
 
 > 打开一个选择器
 >
 > 新的`selector`是系统范围内的`java.nio.channels.spi.SelectorProvider`对象通过调用`java.nio.channels.spi.SelectorProvider.openSelector()`来创建，
+
+#### `boolean isOpen()`
+
+> 检测`selector`是否是打开的
+
+`SelectorProvider provider()`
+
+> 返回创建这个`channel`的`provider`
+
+#### `Set<SelectionKey> keys()`
+
+> 返回这个`selector`的`key set`
+>
+> 这个`key set`不能直接修改，一个`key`必须在它已经被取消，它的`channel`已经被取消注册之后才能被移除，任何修改`key set`的尝试会导致抛出`UnsupportedOperationException`
+>
+> `key set`不是线程安全的
+
+#### `Set<SelectionKey> selectedKeys()`
+
+> 返回这个`selector`的`selected-key set`
+>
+> `key`可以从`selected-key set`中移除，但不能直接添加到`selected-key set`中，任何添加一个对象到`key set`中的尝试会导致抛出`UnsupportedOperationException`
+>
+> `selected-keyset`不是线程安全的
+
+#### `int selectNow()`
+
+> 选择`key`的一个集合，它对应的`channel`已经为`IO`操作做好准备了
+>
+> 这个方法是一个非阻塞的`selection`操作，如果自从前一个`selection`操作之后没有`channel`成为`selectable`，那么这个方法就会返回`0`
+
+#### `int select(long timeout)`
+
+> 选择`key`的一个集合，它对应的`channel`已经为`IO`操作做好准备了
+>
+> 这个方法是一个阻塞的`selection`操作，当至少一个`channel`是`selected`后才会返回，这个`selector`的`wakeup()`方法会被调用，当前线程中断，或者给定的超时时间到期，以先到者为准。
+>
+> 这个方法不能提供实时保证：它通过调用`Object`的`wait(long)`方法来调度超时。
+
+#### `int select()`
+
+> 选择`key`的一个集合，它对应的`channel`已经为`IO`操作做好准备了
+>
+> 这个方法是一个阻塞的`selection`操作，当至少一个`channel`是`selected`后才会返回，这个`selector`的`wakeup()`方法会被调用，或者当前线程被中断，以先到者为准。
 
 ### java.nio.channels.SelectionKey
 
@@ -832,3 +930,4 @@
 > 不阻塞的返回结果，如果`future`尚未完成，这个方法就返回`null`。
 >
 > 由于`null`值可能作为结果标识`future`的成功，所以还需要通过`isDone()`判断`future`是否真的完成了，不要依赖于`null`值
+
