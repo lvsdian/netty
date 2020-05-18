@@ -363,6 +363,14 @@
 >
 > 这个方法是一个阻塞的`selection`操作，当至少一个`channel`是`selected`后才会返回，这个`selector`的`wakeup()`方法会被调用，或者当前线程被中断，以先到者为准。
 
+#### `Selector wakeup()`
+
+> 让第一个尚未返回的`selection`操作返回
+>
+> 如果有另外一个线程调用`select()`或者`select(long)`后正在阻塞，那么会让那个调用立即返回，如果此时没有`selection`操作正在执行，那么下次调用这些方法时就会立即返回，除非同时调用了`selectNow()`方法。任何情况下这个调用的返回值可能是非`0`的。后续`select()`或者`select(long)`的调用依旧像平常一样阻塞，除非再次调用了这个方法
+>
+> 在两次成功的`selection`操作之间多次调用这个方法与只调用一次这个方法的作用相同
+
 ### java.nio.channels.SelectionKey
 
 > 一个代表`java.nio.channels.SelectableChannel`注册到`java.nio.channels.Selector`的`token`。
