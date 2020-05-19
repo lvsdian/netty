@@ -31,6 +31,7 @@
 ![](../img/经典的服务设计.png)
 
 - 多个客户端向服务端发起连接，服务端用相应的处理器处理请求，每个处理器在自己的线程中启动
+- 缺点：一个连接一个线程，如果连接数太大，
 
 ## 经典的`ServerSocket Loop`
 
@@ -61,6 +62,113 @@ class Server implements Runnable {
  		private byte[] process(byte[] cmd) { /* ... */ }
  	}
 }
+```
+
+## 可伸缩性的目标
+
+- 负载增加(客户端连接)时做到优雅降级
+- 资源(`CPU、memory、disk、bandwidth`)增加时候做到持续的改进
+- 可用性及性能目标
+  - 更短的延迟
+  - 高峰期需求
+  - 对于服务质量可以进行调节
+- `divide-and-conquer`通常是获取任何可伸缩性目标的最佳方式
+
+## divide-and-conquer
+
+- 将处理分解成小任务
+
+  - 每个任务都在不阻塞的情况下执行一个动作
+
+- 当可用的时候执行每个任务
+
+  - `IO`事件通常作为触发器来实现
+
+    ![](../img/divide-and-conquer.png)
+
+- `java.nio`中支持的基本的机制
+  - 非阻塞的读和写
+  - 分发与能感知到的`IO`事件相关的任务
+- 很多的变种
+  - 一系列事件驱动的设计
+
+## 事件驱动设计
+
+- 通常比其他方式效率更高
+
+  - 占用更少的资源，并不需要每个客户端都产生一个线程
+  - 成本更低，上下文切换少了，锁也更少了
+  - 但分发变得更慢，手动的将动作绑定到事件上
+
+- 通常编程更困难
+
+  - 必须分解为简单的非阻塞的动作
+    - 类似于`GUI`中的事件驱动动作
+    - 不能消除所有的阻塞：比如`GC`，页面失败
+
+  - 必须跟踪服务的逻辑状态(因为都是异步，要让前一个操作的结果让后一个操作能接收到)
+
+## 背景：AWT中的事件
+
+- ![](../img/AWT.png)
+  - 用户单击按钮，通过`ActionListener`，`actionPerformed()`方法会被执行
+- 事件驱动`IO`用了类似的观点，但在设计上完全不同
+
+## Reactor 模式
+
+- `reactor`通过分发合适的处理器来响应`IO`事件
+  - 类似于`AWT`的线程
+- 处理器执行非阻塞的动作
+  - 类似于`AWT`中的`actionListeners`
+- 通过将处理器绑定到事件来进行管理
+  - 类似于`AWT`中的`addActionListener`
+- 参见`《Pattern-Oriented Software Architecture》`这本书
+
+## 基础版本的`Reactor`设计
+
+​	![](../img/basic_reactor.png)
+
+- 单线程版本
+- 会检测或监听客户端向服务器发起的连接，连接建立好后，`Reactor`会通过派发`(dispatch)`的方式将客户端发送的数据派发给特定的处理器，由处理器处理
+
+## java.nio的支持
+
+- `Channels`
+  - 连接到文件、`socket`等等，支持非阻塞的读
+- `Buffers`
+  - 类似于数组的对象，可以被`Channel`直接的读或写
+- `Selectors`
+  - 告诉我们一组`Channel`中哪些有`IO`事件
+- `SelectionKeys`
+  - 维护`IO`事件的状态和绑定信息
+
+## Reactor 1: Setup
+
+```java
+class Reactor implements Runnable {
+    final Selector selector;
+    final ServerSocketChannel serverSocket;
+    
+    Reactor(int port) throws IOException {
+        // 创建Selector对象
+        selector = Selector.open();
+        // 创建ServerSocketChannel对象
+        serverSocket = ServerSocketChannel.open();
+        // 绑定到特定地址
+        serverSocket.socket().bind(new InetSocketAddress(port));
+        // 配置为非阻塞
+        serverSocket.configureBlocking(false);
+        // 注册，键为 SelectionKey.OP_ACCEPT
+        SelectionKey sk = serverSocket.register(selector,SelectionKey.OP_ACCEPT);
+        sk.attach(new Acceptor());
+    }
+    /** 
+     * 也可以通过这种方式来创建Selector
+     *
+     * SelectorProvider p = SelectorProvider.provider();
+     * selector = p.openSelector();
+     * serverSocket = p.openServerSocketChannel(); 
+     */
 ```
 
 
