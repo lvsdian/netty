@@ -1,3 +1,5 @@
+[toc]
+
 # Java中可伸缩的`IO`
 
 `Doug Lea`
@@ -90,6 +92,7 @@ class Server implements Runnable {
   - 非阻塞的读和写
   - 分发与能感知到的`IO`事件相关的任务
 - 很多的变种
+  
   - 一系列事件驱动的设计
 
 ## 事件驱动设计
@@ -171,5 +174,284 @@ class Reactor implements Runnable {
      */
 ```
 
+## Reactor 2: Dispatch Loop
 
+```java
+    // class Reactor continued
+    public void run() { // normally in a new
+        Thread
+        try {
+            while (!Thread.interrupted()) {
+                selector.select();
+                Set selected = selector.selectedKeys();
+                Iterator it = selected.iterator();
+                while (it.hasNext())
+                    dispatch((SelectionKey)(it.next());
+                selected.clear();
+            }
+        } catch (IOException ex) { /* ... */ }
+    }
+    void dispatch(SelectionKey k) {
+        // 通过attachment方法获取之前attach的Acceptor对象
+        Runnable r = (Runnable)(k.attachment());
+        if (r != null)
+            r.run();
+    }
+```
 
+## Reactor 3:Acceptor
+
+```java
+    // class Reactor continued
+    class Acceptor implements Runnable { // inner
+        public void run() {
+            try {
+                SocketChannel c = serverSocket.accept();
+                if (c != null)
+                    new Handler(selector, c);
+            }catch(IOException ex) { /* ... */ }
+        }
+    }
+}
+```
+
+![](../img/reactor.png)
+
+## Reactor 4:Handler setup
+
+```java
+final class Handler implements Runnable {
+    final SocketChannel socket;
+    final SelectionKey sk;
+    ByteBuffer input = ByteBuffer.allocate(MAXIN);
+    ByteBuffer output = ByteBuffer.allocate(MAXOUT);
+    static final int READING = 0, SENDING = 1;
+    int state = READING;
+    Handler(Selector sel, SocketChannel c) throws IOException {
+        socket = c; 
+        c.configureBlocking(false);
+        // Optionally try first read now
+        sk = socket.register(sel, 0);
+        sk.attach(this);
+        // 对读感兴趣
+        sk.interestOps(SelectionKey.OP_READ);
+        sel.wakeup();
+    }
+    boolean inputIsComplete() { /* ... */ }
+    boolean outputIsComplete() { /* ... */ }
+    void process() { /* ... */ }
+```
+
+## Reactor 5:Request handling
+
+```java
+    // class Handler continued
+    public void run() {
+        try {
+            if (state == READING) read();
+            else if (state == SENDING) send();
+        } catch (IOException ex) { /* ... */ }
+    }
+    void read() throws IOException {
+        socket.read(input);
+        if (inputIsComplete()) {
+            process();
+            state = SENDING;
+            // Normally also do first write now
+            sk.interestOps(SelectionKey.OP_WRITE);
+        }
+    }
+    void send() throws IOException {
+        socket.write(output);
+        if (outputIsComplete()) 
+            sk.cancel();
+    }    
+}
+```
+
+## Per-State Handlers
+
+- 状态对象模式的简单使用
+
+  ```java
+  class Handler { // ...
+      public void run() { // initial state is reader
+          socket.read(input);
+          if (inputIsComplete()) {
+              process();
+              sk.attach(new Sender());
+              sk.interest(SelectionKey.OP_WRITE);
+              sk.selector().wakeup();
+          }
+      }
+      class Sender implements Runnable {
+          public void run(){ // ...
+              socket.write(output);
+              if (outputIsComplete()) 
+                  sk.cancel();
+          }
+      }
+  }
+  ```
+
+## 多线程的设计
+
+- 策略性的增加了一些线程来实现可伸缩性
+  - 主要应用在多核处理器中
+- 工作线程
+  - `Reactors`应该快速触发处理器
+    - 处理器的处理会减慢`reactor`
+  - 建议将非`IO`的处理转移给其他线程来完成
+- 多`Reactor`线程
+  - `Reactor`线程能进行`IO`处理
+  - 将负载转移给其他的`reactor`
+    - 负载均衡来匹配`CPU`和`IO`的速率
+
+## 工作线程
+
+- 将非`IO`处理移交出去以加快`Reactor`线程
+
+  - 类似于`POSA2 Proactor`设计
+
+- 比将计算绑定处理重写为事件驱动形式更简单
+
+  - 依然应该是纯粹的非阻塞的计算
+    - 足以超过负载的处理
+
+- 但很难与`IO`重叠处理
+
+  - 最好第一次就把所有输入读入到`buffer`中
+
+- 使用线程池可以进行调节和控制
+
+  - 通常需要的线程数量比客户端更少
+
+  ![](../img/work-thread-pool.png)
+
+## handler with thread pool
+
+```java
+class Handler implements Runnable {
+    // uses util.concurrent thread pool
+    static PooledExecutor pool = new PooledExecutor(...);
+    static final int PROCESSING = 3;
+    // ...
+    synchronized void read() { // ...
+        socket.read(input);
+        if (inputIsComplete()) {
+            state = PROCESSING;
+            // 使用线程池处理任务
+            pool.execute(new Processer());
+        }
+    }
+    synchronized void processAndHandOff() {
+        process();
+        state = SENDING; // or rebind attachment
+        // 改变兴趣集为OP_WRITE
+        sk.interest(SelectionKey.OP_WRITE);
+    }
+    class Processer implements Runnable {
+        public void run() { 
+            processAndHandOff(); 
+        }
+    }
+}
+```
+
+## 任务协调
+
+- `handoffs`
+  - 每一个任务都可以触发或者调用下一个，通常这是最快的，但这么做可能会很脆弱
+- `callbacks`
+  - 针对于每个处理器分发器
+  - 设置状态
+  - 是中介模式的一个变种
+- `queues`
+  - 比如在每个阶段传递`buffer`
+
+- `futures`
+  - 当每个任务生成一个结果
+  - 可通过`join`或者`wait/notify`等方式协调
+
+## 使用PooledExecutor
+
+- 一个可以调节的工作线程池
+- 主要的方法是`execute(Runnable r)`
+- 可以控制
+  - 任务队列的种类
+  - 最大线程数
+  - 最小线程数
+  - 按需线程
+  - 保持活动间隔直到空闲线程死亡
+    - 如果有必要后续可以被新线程替换
+  - 饱和策略
+    - 阻塞、丢弃等
+
+## 多个Reactor线程
+
+- 使用`Reactor`池
+
+  - 用于匹配`CPU`和`IO`执行速率
+
+  - 静态或者动态构建
+
+    - 每一个里面都有自己的`Selector`，线程，分发循环
+
+  - 主要的接收器会给`Reactor`分发
+
+    ```java
+        Selector[] selectors; // also create threads
+        int next = 0;
+        class Acceptor { // ...
+            public synchronized void run() { ...
+                Socket connection = serverSocket.accept();
+                if (connection != null)
+                    new Handler(selectors[next], connection);
+                if (++next == selectors.length) next = 0;
+            }
+        }
+    ```
+
+## 使用多个Reactor
+
+![](../img/使用多个Reactor.png)
+
+## 使用其他的java.nio的特性
+
+- 每个`Reactor`有多个`Selector`
+  - 将不同的处理器绑定到不同的`IO`事件上
+  - 需要仔细考虑同步来进行协调
+- 文件传输
+  - 自动化的文件到网络或者网络到文件的拷贝
+- 内存映射文件
+  - 通过`buffer`访问文件
+- 直接缓冲区
+  - 有时可以实现零拷贝传输
+  - 有创建或者销毁的负担
+  - 对长时间存活的应用最有效
+
+## 基于连接的扩展
+
+- 相对于单个服务的请求
+  - 客户端连接
+  - 客户端发送一系列请求/消息
+  - 客户端断开连接
+- 例子
+  - 数据库和事务监控
+  - 多人游戏、聊天等等
+- 可扩展基本的网络服务模式
+  - 处理许多相对存活较长时间的客户端
+  - 跟踪客户端和会话状态
+  - 跨多个主机分发服务
+
+## API浏览
+
+- `Buffer`
+  - `ByteBuffer`
+- `Channel`
+  - `SelectableChannel`
+  - `SocketChannel`
+  - `ServerSocketChannel`
+  - `FileCHannel`
+- `Selector`
+- `SelectionKey`
