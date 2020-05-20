@@ -69,27 +69,27 @@ class Server implements Runnable {
     public void run() {
         try {
             ServerSocket ss = new ServerSocket(PORT);
- 			while (!Thread.interrupted())
+            while (!Thread.interrupted())
                 // 生成新的线程，里面的handler处理客户端请求
- 				new Thread(new Handler(ss.accept())).start();
-		 } catch (IOException ex) { /* ... */ }
- 	}
- 	static class Handler implements Runnable {
-		final Socket socket;
- 		Handler(Socket s) { socket = s; }
- 		public void run() {
+ 		new Thread(new Handler(ss.accept())).start();
+        } catch (IOException ex) { /* ... */ }
+    }
+    static class Handler implements Runnable {
+        final Socket socket;
+        Handler(Socket s) { socket = s; }
+        public void run() {
             // IO操作
- 			try {
- 				byte[] input = new byte[MAX_INPUT];
+            try {
+                byte[] input = new byte[MAX_INPUT];
                 // 获取输入流，读数据
- 				socket.getInputStream().read(input);
+                socket.getInputStream().read(input);
                 // 获取输出流，写数据
- 				byte[] output = process(input);
- 				socket.getOutputStream().write(output);
- 			} catch (IOException ex) { /* ... */ }
- 		}
- 		private byte[] process(byte[] cmd) { /* ... */ }
- 	}
+                byte[] output = process(input);
+                socket.getOutputStream().write(output);
+            } catch (IOException ex) { /* ... */ }
+        }
+        private byte[] process(byte[] cmd) { /* ... */ }
+    }
 }
 ```
 
