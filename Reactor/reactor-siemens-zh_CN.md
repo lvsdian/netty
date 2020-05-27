@@ -83,4 +83,43 @@
   - 当一个应用将`Concrete Event Handler`注册到`Initiation Dispatcher`上时，表示当在`Event Handler`关联的`Handle`上有事件发生时，`Initiation Dispatcher`会通知`Concrete Event Handler`。
   - `Initiation Dispatcher`要求每个`Event Handler`返回它内部的`Handle`。这个`Handle`表示操作系统的`Event Handler`
   - 当所有的`Event Handlers`都注册后，应用程序调用`handle events`来启动`Initiation Dispatcher`的事件循环。这时，`Initiation Dispatcher`结合每个已注册`Event Handler`的`Handle`，使用`Synchronous Event Demultiplexer`在这些`Handles`上来等待事件的发生。比如，`TCP`协议层使用`select`同步事件多路复用操作在已连接的`socket handles`来等待客户端日志记录事件请求
+  - 当与`Handle`相应的一个事件源变为`ready`状态时，`Synchronous Event Demultiplexer`会通知`Iniaiation Dispatcher`。比如一个`TCP socket`变为`ready for reading`
+  - `Initiation Dispatcher`触发`Event Handler`的钩子方法已响应就绪的`Handles`上的事件。当事件发生时，`Initiation Dispatcher`使用事件源激活的`Handles`作为`keys`来定位和分发合适的`Event Handler`的钩子方法
+  - `Initiation Dispatcher`调用`Event Handler`的`handler event`钩子方法来执行特定于应用的功能以响应事件。发生的事件类型可以当做一个参数传递给钩子方法，并由该方法在内部用于执行额外的特定于服务的多路复用和分发
+  
+- 下面的交互图说明了`Reactor`模式中应用代码与的模块间的协作关系：
 
+  ![](../img/reactor_collaborations.png)
+
+### 协作场景
+
+- 日志服务器中的`Reactor`模式协作场景有两个部分，这两个场景展示了日志服务器是如何使用响应式事件来分发`handles`连接请求以及记录来自多个客户端的记录请求。
+
+#### 客户端连接到响应式日志服务器
+
+- 第一个场景展示了客户端连接到日志服务器的步骤
+
+  ![](../img/con_logging_server.png)
+
+- 总结步骤如下
+  1. 日志服务器注册到`Logging Acceptor`到`Initiation Dispatcher`来处理连接请求
+  2. 日志服务器调用`Initiation Dispatcher`的`handle event`方法
+  3. `Initiation Dispatcher`调用同步事件多路复用器的`select`方法，等待连接请求或者日志数据到达
+  4. 客户端连接到日志服务器
+  5. `Initiation Dispatcher`通知`Logging Acceptor`有新连接到达
+  6. `Logging Acceptor`接收新连接
+  7. `Logging Acceptor`创建一个`Logging Handler`来为新客户端服务
+  8. `Logging Handler`将它的`socket handle`注册到`Initiation Dispatcher`，并且要求当`socket`变为`ready for reading`时通知它
+
+####客户端发送日志记录到响应式日志服务器
+
+- 第二个场景展示响应式日志服务器处理日志记录请求的步骤：
+
+  ![](../img/take_logging_record.png)
+
+- 总结步骤如下：
+  1. 客户端发送日志记录请求
+  2. 当客户端的日志记录请求在`socket`队列上时，`Initiation Dispatcher`通知关联的`Logging Handler`
+  3. 以非阻塞方式接受日志记录(重复步骤2和步骤3知道被完全接收)
+  4. `Logging Handler`处理日志记录并把它写到标准输出中
+  5. `Logging Handler`返回到`Initiation Dispatcher`的事件循环
