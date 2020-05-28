@@ -939,3 +939,30 @@
 >
 > 由于`null`值可能作为结果标识`future`的成功，所以还需要通过`isDone()`判断`future`是否真的完成了，不要依赖于`null`值
 
+### Reactor模式
+
+[nio](Reactor/nio-zh_CN.md)
+
+[reactor-siemens](Reactor/reactor-siemens-zh_CN.md)
+
+​		![](img/reactor_design.png)
+
+- 概述
+  - `Initiation Dispatcher`启动后会将若干个`Event Handler`注册到其上，注册的同时指定感兴趣的事件，这个感兴趣的事件是被`Handle`所标识的，因为`Handle`是被`Event Handler`所拥有的。当感兴趣的事件在`Event Handler`所关联的`Handle`上产生的时候，由`Initiation Dispatcher`通知`Concrete Event Handler`。
+  - `Event Handler`注册到`Initiation Dispatcher`完毕之后，`Initiation Dispatcher`就开启了自己的事件循环，是个死循环。由`Synchronous Event Demultiplexer`等待事件的产生，然后它会将产生的事件的集合返回给`Initiation Dispatcher`，`Initiation Dispatcher`选择与事件对应的`Event Handler`，遍历这个`Event Handler`，根据事件的`type`调用注册到其上的`Concrete Event Handler`的`handle event(type)`方法。
+- 流程
+  1. 当应用向`Initiation Dispatcher`注册具体的事件处理器时，应用会标识出该事件处理器希望`Initiation Dispatcher`在某个事件发生时向其通知的事件，该事件与`Handle`关联
+  2. `Initiation Dispatcher`会要求每个事件处理器向其传递内部的`Handle`。该`Handle`向操作系统标识了事件处理器
+  3. 当所有的事件处理器注册完毕后，应用会调用`handle_event`方法来启动`Initiation Dispatcher`的事件循环。这时，`Initiation Dispatcher`会将每个注册的事件管理器的`Handle`合并起来，并使用同步事件分离器等待这些事件的发生。比如说，`TCP`协议层会使用`select`同步事件分离器操作来等待客户端发送的数据到达连接的`socket handle`上
+  4. 当与某个事件源对应的`handle`变为`ready`状态时(比如说，`TCP socket`变为等待读状态)，同步事件分离器就会通知`Initiation Dispatcher`。
+  5. `Initiation Dispatcher`会触发事件处理器的回调方法，从而响应这个处于`ready`状态的`handle`。当事件发生时，`Initiation Dispatcher`会将被事件源激活的`handle`作为`key`来寻找并分发恰当的事件处理器回调方法。
+  6. `Initiation Dispatcher`会回调事件处理器的`handle_event`方法来执行特定于应用的功能（开发者自己所编写的功能），从而相应这个事件。所发生的的事件类型可作为该方法参数并被该方法内部使用来执行额外的特定于服务的分离和分发
+
+#### netty中的Reactor模式
+
+- 多个客户端向`BossGroup`发起连接请求，`BossGroup`基于`NIO`的选择器进  行操作，里面会有一个`selector`，`selector`不断循环，检测客户端向其发起的连接。`BossGroup`监听`OP_ACCEPT`事件，一旦事件发生后，会接受这个连接。将`accept()`方法返回的结果传递给`WorkerGroup`。
+- `accept()`方法返回的结果是`SelectionKey`的集合，`SelectionKey`有个`channel()`方法，这个方法返回 `SelectableChannel` ，这个`SelectableChannel`就是`java.nio.channels.SocketChannel`，这个`SocketChannel`会被注册到`WorkerGroup`的`selector`上。
+- 将客户端的连接转交给`WorkerGroup`，`WorkerGroup`监听`OP_READ`事件，它的`selector`不断循环，等待事件的发生。事件到达时，直接和`WorkerGroup`进行数据传递。
+
+
+
