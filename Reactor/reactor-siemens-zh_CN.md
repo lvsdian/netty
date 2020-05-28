@@ -1,4 +1,19 @@
-[toc]
+* [Reactor](#reactor)
+  * [意图](#%E6%84%8F%E5%9B%BE)
+  * [实例](#%E5%AE%9E%E4%BE%8B)
+  * [上下文](#%E4%B8%8A%E4%B8%8B%E6%96%87)
+  * [问题](#%E9%97%AE%E9%A2%98)
+  * [解决方案](#%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88)
+  * [结构](#%E7%BB%93%E6%9E%84)
+    * [Handles](#handles)
+    * [Synchronous Event Demultiplexer](#synchronous-event-demultiplexer)
+    * [Initiation Dispatcher](#initiation-dispatcher)
+    * [Event Handler](#event-handler)
+    * [Concrete Event Handler](#concrete-event-handler)
+  * [Dynamics](#dynamics)
+    * [模块间的协作关系](#%E6%A8%A1%E5%9D%97%E9%97%B4%E7%9A%84%E5%8D%8F%E4%BD%9C%E5%85%B3%E7%B3%BB)
+    * [协作场景](#%E5%8D%8F%E4%BD%9C%E5%9C%BA%E6%99%AF)
+      * [客户端连接到响应式日志服务器](#%E5%AE%A2%E6%88%B7%E7%AB%AF%E8%BF%9E%E6%8E%A5%E5%88%B0%E5%93%8D%E5%BA%94%E5%BC%8F%E6%97%A5%E5%BF%97%E6%9C%8D%E5%8A%A1%E5%99%A8)
 
 # Reactor
 

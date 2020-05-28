@@ -1,3 +1,7 @@
+* [传统方式 VS Reactor](#%E4%BC%A0%E7%BB%9F%E6%96%B9%E5%BC%8F-vs-reactor)
+  * [传统模式](#%E4%BC%A0%E7%BB%9F%E6%A8%A1%E5%BC%8F)
+  * [Reactor](#reactor)
+
 ## 传统方式 VS Reactor
 
 ### 传统模式
@@ -30,7 +34,7 @@
 
   2. `Synchronous Event Demultiplexer`（同步事件分离器）
   - 它本身是一个系统调用，用于等待事件的发生（事件可能是一个，也可能是多个）。调用方在调用它的时候会被阻塞，一直阻塞到同步事件分离器上有事件产生为止。对`Linux`来说，同步事件分离器指的就是常用的`IO`多路复用分离机制，比如`select`、`poll`、`epoll`.
-     
+    
   - 在`java`的`NIO`中，同步事件分离器对应的组件就是`Selector`，对应的阻塞方法就是`select()`方法
   3. `Event Handler`（事件处理器）
 
