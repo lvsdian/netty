@@ -22,12 +22,11 @@
 
 ![](../img/reactor_design.png)
 
-- 流程
-  - `Event Handle`提前已经注册到`Initiation Dispatcher`中，当事件发生时，`Event Handle`中的方法会被回调。 
-  - `Event Handler`提供了事件回调方法`handle_event(type)`、`get_handle()`，通过`get_handle()`获得与`Event Handler`所关联的`Handle`。
-  - `Event Handler`本身是拥有`Handle`的，`Handle`是事件的发源地，事件产生后，由`Synchronous Event Demultiplexer`检测到，传递给`Initiation Dispatcher`，`Initiation Dispatcher`会在已经注册的`Event Handler`中选择一个与这个事件相关的`Event Handler`，然后调用这个`Event Handler`的`handle event(type)`方法
-
-- `Reactor`模式组件
+- 概述
+  - `Initiation Dispatcher`启动后会将若干个`Event Handler`注册到其上，注册的同时指定感兴趣的事件，这个感兴趣的事件是被`Handle`所标识的，因为`Handle`是被`Event Handler`所拥有的。当感兴趣的事件在`Event Handler`所关联的`Handle`上产生的时候，由`Initiation Dispatcher`通知`Concrete Event Handler`。
+  - `Event Handler`注册到`Initiation Dispatcher`完毕之后，`Initiation Dispatcher`就开启了自己的事件循环，是个死循环。由`Synchronous Event Demultiplexer`等待事件的产生，然后它会将产生的事件的集合返回给`Initiation Dispatcher`，`Initiation Dispatcher`选择与事件对应的`Event Handler`，遍历这个`Event Handler`，根据事件的`type`调用注册到其上的`Concrete Event Handler`的`handle event(type)`方法。
+  
+- 组件
   1. `Handle`（句柄/描述符）
      - 本质上表示一种资源，由操作系统提供，该资源表示一个个的事件，比如说文件描述符、网络编程中的`socket`描述符。事件既可以来自于外部，也可以来自于内部；外部事件比如说客户端的连接请求，客户端发送过来数据等，内部事件如操作系统产生的定时器事件等。本质上是一种文件描述符。
      - `handle`是事件产生的发源地，比如客户端向服务器端发起一个连接，这个事件就由`handle`产生，连接建立好后，客户端向服务器端发送数据，就会收到一个`read`事件，这个也是由`handle`产生
@@ -51,3 +50,11 @@
 
      - 它会使用`Synchronous Event Demultiplexer`的`select()`方法的结果，即各个事件，初始分发器拿到一个`SelectionKey`的集合，然后遍历，就相当于拿到了事件。
 
+- 流程
+
+1. 当应用向`Initiation Dispatcher`注册具体的事件处理器时，应用会标识出该事件处理器希望`Initiation Dispatcher`在某个事件发生时向其通知的事件，该事件与`Handle`关联
+2. `Initiation Dispatcher`会要求每个事件处理器向其传递内部的`Handle`。该`Handle`向操作系统标识了事件处理器
+3. 当所有的事件处理器注册完毕后，应用会调用`handle_event`方法来启动`Initiation Dispatcher`的事件循环。这时，`Initiation Dispatcher`会将每个注册的事件管理器的`Handle`合并起来，并使用同步事件分离器等待这些事件的发生。比如说，`TCP`协议层会使用`select`同步事件分离器操作来等待客户端发送的数据到达连接的`socket handle`上
+4. 当与某个事件源对应的`handle`变为`ready`状态时(比如说，`TCP socket`变为等待读状态)，同步事件分离器就会通知`Initiation Dispatcher`。
+5. `Initiation Dispatcher`会触发事件处理器的回调方法，从而响应这个处于`ready`状态的`handle`。当事件发生时，`Initiation Dispatcher`会将被事件源激活的`handle`作为`key`来寻找并分发恰当的事件处理器回调方法。
+6. `Initiation Dispatcher`会回调事件处理器的`handle_event`方法来执行特定于应用的功能（开发者自己所编写的功能），从而相应这个事件。所发生的的事件类型可作为该方法参数并被该方法内部使用来执行额外的特定于服务的分离和分发
