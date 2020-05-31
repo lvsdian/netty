@@ -1,3 +1,5 @@
+[toc]
+
 ### netty概述
 
 - [netty](netty.io)是一个**异步的基于事件驱动的网络应用框架**，用于快速开发可维护的高性能协议服务端和客户端。
@@ -917,6 +919,77 @@
 > 不阻塞的返回结果，如果`future`尚未完成，这个方法就返回`null`。
 >
 > 由于`null`值可能作为结果标识`future`的成功，所以还需要通过`isDone()`判断`future`是否真的完成了，不要依赖于`null`值
+
+####`io.netty.channel.ChannelPipeline`
+
+> `ChannelPipeline`继承了`ChannelInboundInvoker`、`ChannelOutboundInvoker`、`java.lang.Iterable`三个接口
+>
+> 它是一个`ChannelHander`的列表（`ChannelHander`即`Reactor`模式中的`Event Handler`），它会处理或者拦截`Channel`中的`inbound`事件和`outbound`操作。`ChannelPipeline`实现了一种高级的[Intercepting Filter](http://www.oracle.com/technetwork/java/interceptingfilter-142169.html)模式，以此让用户完全控制如何处理器事件以及`pipeline`中的`ChannelHandler`是如何交互的
+>
+> 每个`Channel`都会有一个它自己的`pipeline`，当一个`channel`被创建时，它的`pipeline`会被自动创建
+>
+> 下面这个图描述了`IO`事件是如何被`ChannelPipeline`中的`ChannelHandler`处理的，一个`IO`事件要么被`ChannelInboundHandler`处理，要么被`ChannelOutboundHandler`处理，再通过调用`ChannelHandlerContext`中定义的事件传播方法转发给最近的`handler`，比如`ChannelHandlerContext#fireChannelRead(Object)`方法、`ChannelHandlerContext#write(Object)`方法。
+>
+> 如下，`Inbound`与`Outbound`不会产生直接的关联关系，工作是互相隔开的：
+>
+> ```java
+>                               I/O Request via  Channel or ChannelHandlerContext
+>                                                      |
+>                                   					 |
+>  +---------------------------------------------------+---------------+
+>  |                           ChannelPipeline         |               |
+>  |                                                  \|/              |
+>  |    +---------------------+            +-----------+----------+    |
+>  |    | Inbound Handler  N  |            | Outbound Handler  1  |    |
+>  |    +----------+----------+            +-----------+----------+    |
+>  |              /|\                                  |               |
+>  |               |                                  \|/              |
+>  |    +----------+----------+            +-----------+----------+    |
+>  |    | Inbound Handler N-1 |            | Outbound Handler  2  |    |
+>  |    +----------+----------+            +-----------+----------+    |
+>  |              /|\                                  .               |
+>  |               .                                   .               |
+>  | ChannelHandlerContext.fireIN_EVT() ChannelHandlerContext.OUT_EVT()|
+>  |        [ method call]                       [method call]         |
+>  |               .                                   .               |
+>  |               .                                  \|/              |
+>  |    +----------+----------+            +-----------+----------+    |
+>  |    | Inbound Handler  2  |            | Outbound Handler M-1 |    |
+>  |    +----------+----------+            +-----------+----------+    |
+>  |              /|\                                  |               |
+>  |               |                                  \|/              |
+>  |    +----------+----------+            +-----------+----------+    |
+>  |    | Inbound Handler  1  |            | Outbound Handler  M  |    |
+>  |    +----------+----------+            +-----------+----------+    |
+>  |              /|\                                  |               |
+>  +---------------+-----------------------------------+---------------+
+>                  |                                  \|/
+>  +---------------+-----------------------------------+---------------+
+>  |               |                                   |               |
+>  |       [ Socket.read() ]                    [ Socket.write() ]     |
+>  |                                                                   |
+>  |  Netty Internal I/O Threads (Transport Implementation)            |
+>  +-------------------------------------------------------------------+                      
+> ```
+>
+> 一个`inbound`事件是由`inbound handler`自下向上的方向进行处理，`inbound handler`通常处理由`IO`线程所生成的`inbound data`，`inbound data`通常是通过实际的输入操作比如`SocketChannel#read(ByteBuffer)`从远端读取的，如果一个`inbound event`已经超过了`inbound handler`的顶部边界（假设总共只有`N`个`inbound handler`，就不能超过`N`），它就会被悄无声息的丢掉，如果你需要也可以以日志的方式记录下来
+>
+> `outbound`事件是由`outbound handler`自上至下的方向处理的，`outbound handler`通常会生成或传输`outbound data`比如写请求，如果一个`outbound event`超出了最下面的`outbound handler`，它就会被与`Channel`相关的`IO`线程处理，`IO`线程通常会执行实际的`IO`操作如`SocketChannel#write(ByteBuffer)`
+>
+> 比如说，假设我们创建了如下的`pipeline`:
+>
+> ```java
+> ChannelPipeline p = ...;
+> p.addLast("1", new InboundHandlerA());
+> p.addLast("2", new InboundHandlerB());
+> p.addLast("3", new OutboundHandlerA());
+> p.addLast("4", new OutboundHandlerB());
+> p.addLast("5", new InboundOutboundHandlerX());
+> ```
+>
+> 在这里例子中，`Inbound`开头的这个类表示它是一个`Inbound handler`，`Outbound`开头的这个类表示它是一个`Outbound handler`，对于这个配置的例子的来说，当事件`inbound`时的处理顺序就是`1,2,3,4,5`，当事件`outbound`时的处理顺序就是`5,4,3,2,1`，`ChannelPipeline`会跳过某些处理器来减少栈的深度：
+>
+> 
 
 ### Reactor模式
 
