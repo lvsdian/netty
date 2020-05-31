@@ -1,49 +1,3 @@
-* [netty概述](#netty%E6%A6%82%E8%BF%B0)
-  * [设计](#%E8%AE%BE%E8%AE%A1)
-* [BIO](#bio)
-  * [装饰者模式](#%E8%A3%85%E9%A5%B0%E8%80%85%E6%A8%A1%E5%BC%8F)
-* [NIO](#nio)
-* [java\.nio\.Buffer](#javaniobuffer)
-  * [零拷贝](#%E9%9B%B6%E6%8B%B7%E8%B4%9D)
-* [java\.nio\.MappedByteBuffer](#javaniomappedbytebuffer)
-* [java\.nio\.channels\.Channel](#javaniochannelschannel)
-* [java\.nio\.channels\.Selector](#javaniochannelsselector)
-* [java\.nio\.channels\.SelectionKey](#javaniochannelsselectionkey)
-  * [SelectableChannel channel()](#selectablechannel-channel)
-  * [Selector selector()](#selector-selector)
-  * [boolean isValid()](#boolean-isvalid)
-  * [void cancel()](#void-cancel)
-  * [int interestOps()](#int-interestops)
-* [零拷贝](#%E9%9B%B6%E6%8B%B7%E8%B4%9D-1)
-* [源码分析](#%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90)
-  * [io\.netty\.util\.concurrent\.EventExecutorGroup](#ionettyutilconcurrenteventexecutorgroup)
-    * [EventExecutor next()](#eventexecutor-next)
-  * [io\.netty\.channel\.EventLoopGroup](#ionettychanneleventloopgroup)
-    * [EventLoop next()](#eventloop-next)
-    * [ChannelFuture register(Channel channel)](#channelfuture-registerchannel-channel)
-    * [ChannelFuture register(ChannelPromise promise)](#channelfuture-registerchannelpromise-promise)
-  * [io\.netty\.channel\.nio\.NioEventLoopGroup](#ionettychannelnionioeventloopgroup)
-  * [io\.netty\.bootstrap\.ServerBootstrap](#ionettybootstrapserverbootstrap)
-    * [group(EventLoopGroup parentGroup, EventLoopGroup childGroup)](#groupeventloopgroup-parentgroup-eventloopgroup-childgroup)
-    * [channel(Class&lt;? extends C&gt; channelClass)](#channelclass-extends-c-channelclass)
-    * [io\.netty\.channel\.socket\.nio\.NioServerSocketChannel](#ionettychannelsocketnionioserversocketchannel)
-    * [childHandler(ChannelHandler childHandler)](#childhandlerchannelhandler-childhandler)
-    * [ChannelFuture bind(int inetPort)](#channelfuture-bindint-inetport)
-  * [io\.netty\.channel\.ChannelFuture](#ionettychannelchannelfuture)
-    * [Channel channel()](#channel-channel)
-      * [get()](#get)
-      * [get(long timeout, TimeUnit unit)](#getlong-timeout-timeunit-unit)
-      * [boolean cancel(boolean mayInterruptIfRunning)](#boolean-cancelboolean-mayinterruptifrunning)
-      * [boolean isDone()](#boolean-isdone)
-    * [io\.netty\.util\.concurrent\.Future](#ionettyutilconcurrentfuture)
-      * [boolean isSuccess()](#boolean-issuccess)
-      * [boolean isCancellable()](#boolean-iscancellable)
-      * [Throwable cause()](#throwable-cause)
-      * [Future&lt;V&gt; addListener(GenericFutureListener&lt;? extends Future&lt;? super V&gt;&gt; listener)](#futurev-addlistenergenericfuturelistener-extends-future-super-v-listener)
-      * [Future&lt;V&gt; sync() throws InterruptedException](#futurev-sync-throws-interruptedexception)
-      * [Future&lt;V&gt; await() throws InterruptedException](#futurev-await-throws-interruptedexception)
-      * [V getNow()](#v-getnow)
-
 ### netty概述
 
 - [netty](netty.io)是一个**异步的基于事件驱动的网络应用框架**，用于快速开发可维护的高性能协议服务端和客户端。
@@ -849,6 +803,29 @@
 
 > 返回一个`Channel`，这个`Channel`是与`future`相关的`IO`操作的`Channel`
 
+##### `io.netty.channel.Channel`
+
+> 它表示一个网络`socket`的连接或者是一个可以进行`IO`操作的组件，比如读、写、连接、绑定。
+>
+> 一个`channel`可以向用户提供如下功能：
+>
+> - 当前`channel`的状态（比如是否打开了、是否已经连接了）
+> - `channel`的配置参数（比如接受的缓冲区大小）
+> - `channel`支持的`IO`操作（比如读、写、连接、绑定）
+> - 处理与`channel`关联的请求和所有`IO`事件的`ChannelPipeline`
+>
+> 所有的`IO`操作都是异步的，这意味着所有的`IO`调用都会立即返回，但不保证所请求的`IO`操作在调用结束时已经完成，相反的，你可以得到一个`ChannleFuture`实例，当请求的`IO`操作成功了、失败了、取消了，这个`ChannelFuture`就会通知你。
+>
+> `Channel`是可继承的，`Channel`根据创建的方式不同可以有一个`parent`，比如一个·`SocketChannel`是被一个`ServerSocketChannel`所接受的，它会将`ServerSocketChannel`作为`parent()`方法返回的结果
+>
+> 这种层次化结构的语义是取决于`Channel`所属的传输层的实现，比如你可以编写一个新的`Channel`实现让它创建子`Channel`，让这个`Channel`与子`Channel`共享`socket`连接，比如[`GEEP`](http://beepcore.org/)和[`SSH`](http://en.wikipedia.org/wiki/Secure_Shell)。
+>
+> 向下转换以去访问特定于传输的操作。有些传输会公开额外的操作，这种额外的操作是特定于传输的，这时就可以进行向下转换，将`Channel`转换为它的子类型来去调用这种操作，比如老式的数据报的传输，多个`join/leave`操作是通过`DatagramChannel`来提供的。
+>
+> 释放资源，当你已经使用完`Channel`后，调用`close()`或者`close(ChannelPromise promise)`去释放所有的资源是很重要的，这种方法可以保证所有的资源以一种恰当的方式得到释放，比如释放文件句柄
+
+##### `java.util.concurrent.Future`
+
 > 一个`Future`代表一个异步计算的结果。`Future`提供了一些方法来检查计算是否完成了，还有些方法会等待计算的完成，还有些方法用来获取计算的结果。当计算完成时，计算的结果只能通过`get()`方法获取，计算完成之前`get()`方法会阻塞。取消操作是通过`cancle()`方法来完成的。此外`Future`还提供了附加的方法来确定任务是正常完成还是取消掉了。一旦计算完成，就不能被取消了。如果你想以取消为目的用了`Future`，但又没有提供一个可用的结果，你就可以声明这种形式的的`Future`，返回`null`作为它底层任务的结果。
 >
 > ```java
@@ -909,6 +886,8 @@
 
 ##### `io.netty.util.concurrent.Future`
 
+> 一个异步操作的结果
+
 ###### `boolean isSuccess()`
 
 > 当且仅当`IO`操作完成了就返回`true`
@@ -960,9 +939,57 @@
 
 #### netty中的Reactor模式
 
-- 多个客户端向`BossGroup`发起连接请求，`BossGroup`基于`NIO`的选择器进  行操作，里面会有一个`selector`，`selector`不断循环，检测客户端向其发起的连接。`BossGroup`监听`OP_ACCEPT`事件，一旦事件发生后，会接受这个连接。将`accept()`方法返回的结果传递给`WorkerGroup`。
-- `accept()`方法返回的结果是`SelectionKey`的集合，`SelectionKey`有个`channel()`方法，这个方法返回 `SelectableChannel` ，这个`SelectableChannel`就是`java.nio.channels.SocketChannel`，这个`SocketChannel`会被注册到`WorkerGroup`的`selector`上。
-- 将客户端的连接转交给`WorkerGroup`，`WorkerGroup`监听`OP_READ`事件，它的`selector`不断循环，等待事件的发生。事件到达时，直接和`WorkerGroup`进行数据传递。
+- `netty`中的`Reactor`模式实现：
+
+  ![](img/使用多个Reactor.png)
+
+- `mainReactor`和`subReactor`就相当于`Reactor`模式中的`Initiation Dispatcher`，`mainReactor`用来接受连接，接收后通过`acceptor`将连接扔给`subReactor`。`bossGroup`相当于`mainReactor`，`workerGroup`相当于`subReactor`。
+
+- 实现：
+
+  - 在`ServerBootstrap`的`init(Channel channel)`方法中有如下实现：
+
+    ```java
+    @Override
+    void init(Channel channel) throws Exception {
+        // ...
+        ChannelPipeline p = channel.pipeline();
+        // ...
+        p.addLast(new ChannelInitializer<Channel>() {
+            @Override
+            public void initChannel(final Channel ch) throws Exception {
+            // ...
+                ch.eventLoop().execute(new Runnable() {
+                	@Override
+                	public void run() {
+                		// 往channel的pipeline中添加一个ServerBootstrapAcceptor
+                    	pipeline.addLast(new ServerBootstrapAcceptor(
+                                    ch, currentChildGroup, currentChildHandler, currentChildOptions, currentChildAttrs));
+    				}
+    			});
+    		}
+    	});
+    }
+    ```
+
+  - 而`ServerBootstrapAcceptor`是`io.netty.bootstrap.ServerBootstrap`的一个静态私有内部类，它继承了`ChannelInboundHandlerAdapter`类，它实现的`channelRead()`方法中有如下代码：
+
+    ```java
+    // childGroup是一个EventLoopGroup对象，使用它注册Channel类型的child，
+    childGroup.register(child).addListener(new ChannelFutureListener() {
+    	@Override
+    	public void operationComplete(ChannelFuture future) throws Exception {
+    		if (!future.isSuccess()) {
+    			forceClose(child, future.cause());
+            }
+    	}
+    });
+    ```
+
+- 执行流程
+  - 多个客户端向`BossGroup`发起连接请求，`BossGroup`基于`NIO`的选择器进行操作，里面会有一个`selector`，`selector`不断循环，检测客户端向其发起的连接。`BossGroup`监听`OP_ACCEPT`事件，一旦事件发生后，会接受这个连接。将`accept()`方法返回的结果传递给`WorkerGroup`。
+  - `accept()`方法返回的结果是`SelectionKey`的集合，`SelectionKey`有个`channel()`方法，这个方法返回 `SelectableChannel` ，这个`SelectableChannel`就是`java.nio.channels.SocketChannel`，这个`SocketChannel`会被注册到`WorkerGroup`的`selector`上。
+  - 将客户端的连接转交给`WorkerGroup`，`WorkerGroup`监听`OP_READ`事件，它的`selector`不断循环，等待事件的发生。事件到达时，直接和`WorkerGroup`进行数据传递。
 
 
 
