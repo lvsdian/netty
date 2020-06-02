@@ -920,7 +920,7 @@
 >
 > 由于`null`值可能作为结果标识`future`的成功，所以还需要通过`isDone()`判断`future`是否真的完成了，不要依赖于`null`值
 
-####`io.netty.channel.ChannelPipeline`
+#### `io.netty.channel.ChannelPipeline`
 
 > `ChannelPipeline`继承了`ChannelInboundInvoker`、`ChannelOutboundInvoker`、`java.lang.Iterable`三个接口
 >
@@ -933,43 +933,43 @@
 > 如下，`Inbound`与`Outbound`不会产生直接的关联关系，工作是互相隔开的：
 >
 > ```java
->                               I/O Request via  Channel or ChannelHandlerContext
->                                                      |
->                                   					 |
->  +---------------------------------------------------+---------------+
->  |                           ChannelPipeline         |               |
->  |                                                  \|/              |
->  |    +---------------------+            +-----------+----------+    |
->  |    | Inbound Handler  N  |            | Outbound Handler  1  |    |
->  |    +----------+----------+            +-----------+----------+    |
->  |              /|\                                  |               |
->  |               |                                  \|/              |
->  |    +----------+----------+            +-----------+----------+    |
->  |    | Inbound Handler N-1 |            | Outbound Handler  2  |    |
->  |    +----------+----------+            +-----------+----------+    |
->  |              /|\                                  .               |
->  |               .                                   .               |
->  | ChannelHandlerContext.fireIN_EVT() ChannelHandlerContext.OUT_EVT()|
->  |        [ method call]                       [method call]         |
->  |               .                                   .               |
->  |               .                                  \|/              |
->  |    +----------+----------+            +-----------+----------+    |
->  |    | Inbound Handler  2  |            | Outbound Handler M-1 |    |
->  |    +----------+----------+            +-----------+----------+    |
->  |              /|\                                  |               |
->  |               |                                  \|/              |
->  |    +----------+----------+            +-----------+----------+    |
->  |    | Inbound Handler  1  |            | Outbound Handler  M  |    |
->  |    +----------+----------+            +-----------+----------+    |
->  |              /|\                                  |               |
->  +---------------+-----------------------------------+---------------+
->                  |                                  \|/
->  +---------------+-----------------------------------+---------------+
->  |               |                                   |               |
->  |       [ Socket.read() ]                    [ Socket.write() ]     |
->  |                                                                   |
->  |  Netty Internal I/O Threads (Transport Implementation)            |
->  +-------------------------------------------------------------------+                      
+>                         I/O Request via  Channel or ChannelHandlerContext
+>                                                |
+>                             					 |
+> +---------------------------------------------------+---------------+
+> |                           ChannelPipeline         |               |
+> |                                                  \|/              |
+> |    +---------------------+            +-----------+----------+    |
+> |    | Inbound Handler  N  |            | Outbound Handler  1  |    |
+> |    +----------+----------+            +-----------+----------+    |
+> |              /|\                                  |               |
+> |               |                                  \|/              |
+> |    +----------+----------+            +-----------+----------+    |
+> |    | Inbound Handler N-1 |            | Outbound Handler  2  |    |
+> |    +----------+----------+            +-----------+----------+    |
+> |              /|\                                  .               |
+> |               .                                   .               |
+> | ChannelHandlerContext.fireIN_EVT() ChannelHandlerContext.OUT_EVT()|
+> |        [ method call]                       [method call]         |
+> |               .                                   .               |
+> |               .                                  \|/              |
+> |    +----------+----------+            +-----------+----------+    |
+> |    | Inbound Handler  2  |            | Outbound Handler M-1 |    |
+> |    +----------+----------+            +-----------+----------+    |
+> |              /|\                                  |               |
+> |               |                                  \|/              |
+> |    +----------+----------+            +-----------+----------+    |
+> |    | Inbound Handler  1  |            | Outbound Handler  M  |    |
+> |    +----------+----------+            +-----------+----------+    |
+> |              /|\                                  |               |
+> +---------------+-----------------------------------+---------------+
+>            |                                  \|/
+> +---------------+-----------------------------------+---------------+
+> |               |                                   |               |
+> |       [ Socket.read() ]                    [ Socket.write() ]     |
+> |                                                                   |
+> |  Netty Internal I/O Threads (Transport Implementation)            |
+> +-------------------------------------------------------------------+                      
 > ```
 >
 > 一个`inbound`事件是由`inbound handler`自下向上的方向进行处理，`inbound handler`通常处理由`IO`线程所生成的`inbound data`，`inbound data`通常是通过实际的输入操作比如`SocketChannel#read(ByteBuffer)`从远端读取的，如果一个`inbound event`已经超过了`inbound handler`的顶部边界（假设总共只有`N`个`inbound handler`，就不能超过`N`），它就会被悄无声息的丢掉，如果你需要也可以以日志的方式记录下来
@@ -989,7 +989,80 @@
 >
 > 在这里例子中，`Inbound`开头的这个类表示它是一个`Inbound handler`，`Outbound`开头的这个类表示它是一个`Outbound handler`，对于这个配置的例子的来说，当事件`inbound`时的处理顺序就是`1,2,3,4,5`，当事件`outbound`时的处理顺序就是`5,4,3,2,1`，`ChannelPipeline`会跳过某些处理器来减少栈的深度：
 >
+> - `3`和`4`没有实现`ChannelInboundHandler`，因此`inbound`实际的处理顺序是`1、2、5`
+> - `1`和`2`没有实现`ChannelOutboundHandler`，因此`outbound`实际的处理顺序是`5、4、3`
+> - 如果`5`同时实现了`ChannelInboundHandler`、`ChannelOutboundHandler`，那么它的`inbound`和`outbound`顺序分别为`1,2,5`和`5,4,3`
+>
+> 一个`handler`需要调用定义在`ChannelHandlerContext`中的事件传播方法来将事件传播给下一个处理器，这些方法包括：
+>
+> - `Inbound`事件传播方法：
+>
+>   ```java
+>   ChannelHandlerContext#fireChannelRegistered()
+>   ChannelHandlerContext#fireChannelActive()
+>   ChannelHandlerContext#fireChannelRead(Object)
+>   ChannelHandlerContext#fireChannelReadComplete()
+>   ChannelHandlerContext#fireExceptionCaught(Throwable)
+>   ChannelHandlerContext#fireUserEventTriggered(Object)
+>   ChannelHandlerContext#fireChannelWritabilityChanged()
+>   ChannelHandlerContext#fireChannelInactive()
+>   ChannelHandlerContext#fireChannelUnregistered()
+>   ```
+>
+> - `Outbound`事件传播方法：
+>
+>   ```java
+>   ChannelHandlerContext#bind(SocketAddress, ChannelPromise)
+>   ChannelHandlerContext#connect(SocketAddress, SocketAddress, ChannelPromise)
+>   ChannelHandlerContext#write(Object, ChannelPromise)
+>   ChannelHandlerContext#flush()
+>   ChannelHandlerContext#read()
+>   ChannelHandlerContext#disconnect(ChannelPromise)
+>   ChannelHandlerContext#close(ChannelPromise)
+>   ChannelHandlerContext#deregister(ChannelPromise)
+>   ```
+>
+> 下面这个示例展示了事件传播是如何完成的：
+>
+> ```java
+> public class MyInboundHandler extends ChannelInboundHandlerAdapter {
+>     @Override
+>     public void channelActive(ChannelHandlerContext ctx) {
+>         System.out.println("Connected!");
+>         ctx.fireChannelActive();
+>     }
+> }
+> public class MyOutboundHandler extends ChannelOutboundHandlerAdapter {
+>     @Override
+>     public void close(ChannelHandlerContext ctx,ChannelPromise promise) {
+>         System.out.println("Closing ..");
+>         ctx.close(promise);
+>     }
+> }
+> ```
+>
+> 假设用户在一个`pipeline`中有一个或多个`ChannelHndler`来接收`IO`事件(比如`read`)去处理`IO`操作(比如`write`和`close`)，比如一个典型的服务器在每一个`channel`的`pipeline`中有如下的`handler`，但你的想法可能根据实现的复杂性、协议的不同、业务逻辑等而不同
+>
+> 1. `Protocol Decoder`：将二进制数据转为对象
+> 2. `Protocol Encoder`：将对象转为二进制数据
+> 3. `Business Logic Handler`：执行实际的业务逻辑
+>
+> 可通过如下实例来表示：
+>
+> ```java
+> static final EventExecutorGroup group = new DefaultEventExecutorGroup(16);
+> ...
+> ChannelPipeline pipeline = ch.pipeline();
 > 
+> pipeline.addLast("decoder", new MyProtocolDecoder());
+> pipeline.addLast("encoder", new MyProtocolEncoder());
+> // 告诉pipeline在与IO线程不同的另一个线程中运行MyBusinessLogicHandler的event handler方法，
+> // 这样IO线程就不会被一个耗时的任务所阻塞住
+> // 如果你的业务逻辑是完全异步的，或者完成的非常快，你就不需要指定一个group
+> pipeline.addLast(group, "handler", new MyBusinessLogicHandler());
+> ```
+>
+> `ChannelHandler`在任何时候都可以从`ChannelPipe`中移除或者添加，因为`ChannelPipe`是线程安全的，比如当敏感的数据被交换时，你可以插入一个加密的`handler`，交换完毕后再移除它。
 
 ### Reactor模式
 
