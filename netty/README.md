@@ -1,4 +1,15 @@
+* [netty作用方向](#netty%E4%BD%9C%E7%94%A8%E6%96%B9%E5%90%91)
+* [websocket](#websocket)
+* [rmi](#rmi)
+* [RPC](#rpc)
+* [Protocol Buffers](#protocol-buffers)
+* [Apache Thrift](#apache-thrift)
+* [gRPC](#grpc)
+  * [Service definition](#service-definition)
+  * [Using the API surface](#using-the-api-surface)
+
 ## netty作用方向
+
 - 作为http服务器，类似tomcat,处理请求。但并没有实现servlet规范。
 - socket开发。客户端与服务器端通过socket进行调用，比如dubbo和spark等。
 - 支持长连接开发。
@@ -32,9 +43,9 @@
 ## Protocol Buffers
 - 是一种语言中立，平台中立，可扩展的用于序列化、结构化数据的机制
 [官网](https://developers.google.com/protocol-buffers)
-[文档](https://developers.google.com/protocol-buffers/docs/javatutorial)
+[API](https://developers.google.cn/protocol-buffers/docs/reference/java-generated)
 [下载地址](https://github.com/protocolbuffers/protobuf/releases)    
-- 下载后配置环境变量，即可使用protoc命令，使用protoc运行.proto文件即可生成源代码文件
+- [Protocol Buffer](Protocol_Bufffer.md)
 - 对于同一个proto文件中可能会定义多个message，在传输时具体传输的message需要按需求变化，解决方案可以参考MyDataInfo.proto中定义的MyMessage，
 MyMessage中指定data_type，在传输时指定类型为MyMessage，实际传输的message根据MyMessage的data_type获取。示例可见cn.andios.netty.sixth
 - 对于MyDataInfo.proto生成的java文件，服务端和客户端都需要调用，如何让它们都可以调用?(假设项目基于git管理)
@@ -46,7 +57,7 @@ MyMessage中指定data_type，在传输时指定类型为MyMessage，实际传�
 2. 利用`git subtree`，将ProtoBuf-Java项目拉取到客户端或者服务端中，与`git submodule`不同的是，此时它们属于同一个项目，而不是两个仓库。此时就不存在外层仓库
 与里层仓库分支不一样的情况。
 3. 每次修改都把ProtoBuf-Java项目打成jar包放到私服里，方法可行，但每次修改都要改变版本号，修改pom.xml等文件，比较麻烦
-    
+  
 ## Apache Thrift
 - [下载](https://mirror.bit.edu.cn/apache/thrift/)
 - 可伸缩的跨语言的服务开发，融合一个软件栈和代码生成引擎构建高效的服务。
