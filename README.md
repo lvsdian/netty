@@ -1,5 +1,3 @@
-[toc]
-
 ### netty概述
 
 - [netty](netty.io)是一个**异步的基于事件驱动的网络应用框架**，用于快速开发可维护的高性能协议服务端和客户端。
@@ -1063,6 +1061,63 @@
 > ```
 >
 > `ChannelHandler`在任何时候都可以从`ChannelPipe`中移除或者添加，因为`ChannelPipe`是线程安全的，比如当敏感的数据被交换时，你可以插入一个加密的`handler`，交换完毕后再移除它。
+
+#### `io.netty.channel.ChannelHandlerContext`
+
+> 它可以让`ChannelHandler` 与它的`ChannelPipeline` 以及`ChannelPipeline`中其它的 `handler`进行交互。此外一个`handler`还可以通知`ChannelPipeline`中的下一个`handler`，并且可以动态修改它所属的`ChannelPipeline`。
+>
+> 你可以通过调用如下提供的方法之一来通知同一个`ChannelPipeline`中最近的`handler`。
+>
+> 可以通过调用`pipeline()`方法获得这个`handler`所属的`ChannelPipeline`，应用可以在运行期动态插删除、替换`pipeline`中的`handler`。
+>
+> 你可以获取`ChannelHandlerContext`供后续使用，比如在`handler`方法之外触发一个事件，甚至在不同的线程中触发
+>
+> ```java
+> public class MyHandler extends ChannelDuplexHandler {
+>     private ChannelHandlerContext ctx;
+>     public void beforeAdd(ChannelHandlerContext ctx) {
+>         this.ctx = ctx;
+>     }
+>     public void login(String username, password) {
+>         ctx.write(new LoginMessage(username, password));
+>     }
+>     ...
+> }
+> ```
+>
+> `attr(AttributeKey)`方法可以让你存储并访问与`handler`或者`context`x关联的有状态的信息。
+>
+> 一个`ChannelHandler`实例可以被多次添加到`ChannelPipeline`中，这意味着一个`ChannelHandler`实例可以拥有超过一个`ChannelHandlerContext`。因此如果一个`ChannelHandler`被添加到多个`ChannelPipeline`中，那么它可以被不同的`ChannelHandlerContext`调用。
+>
+> 比如说，如下的`handler`会拥有多个独立的`Attributkey`，数量取决于它被添加到`pipeline`中的次数，无论它是多次添加到同一`pipeline`还是多次添加到不同`pipeline`：
+>
+> ```java
+> public class FactorialHandler extends {@link ChannelInboundHandlerAdapter} {
+> 	private final AttributeKey Integer counter =  AttributeKey.valueOf("counter");
+> 	// This handler will receive a sequence of increasing integers starting
+> 	// from 1.
+> 	@Override
+> 	public void channelRead(ChannelHandlerContext ctx, Object msg) {
+> 		Integer a = ctx.attr(counter).get();
+> 		if (a == null) {
+> 			a = 1;
+> 		}
+> 		attr.set(a * (Integer) msg);
+> 	}
+> }
+> 	// 不同的context对象分别被赋予为f1,f2,f3,f4，即便它们引用的是同一个handler实例，因为
+> 	// FactorialHandler会用AttributeKey在一个context对象中存储了它的状态，因此当两个pipeline
+> 	// 都处于活动的情况下，factorial会被计算4次。
+> 	FactorialHandler fh = new FactorialHandler();
+> 
+> 	ChannelPipeline p1 = Channels.pipeline();
+> 	p1.addLast("f1", fh);
+> 	p1.addLast("f2", fh);
+> 
+> 	ChannelPipeline p2 = Channels.pipeline();
+> 	p2.addLast("f3", fh);
+> 	p2.addLast("f4", fh);
+> ```
 
 ### Reactor模式
 
