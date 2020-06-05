@@ -1,3 +1,5 @@
+[toc]
+
 ### netty概述
 
 - [netty](netty.io)是一个**异步的基于事件驱动的网络应用框架**，用于快速开发可维护的高性能协议服务端和客户端。
@@ -601,98 +603,175 @@
 > ```java
 > // 创建一个新的Channel并绑定它
 > public ChannelFuture bind(int inetPort) {
->     return bind(new InetSocketAddress(inetPort));
+>  return bind(new InetSocketAddress(inetPort));
 > }
 > 
 > // 创建一个新的Channel并绑定它
 > public ChannelFuture bind(SocketAddress localAddress) {
->     // ...
->     return doBind(localAddress);
+>  // ...
+>  return doBind(localAddress);
 > }
 > 
 > private ChannelFuture doBind(final SocketAddress localAddress) {
->     // 初始化并绑定channel，返回其异步执行的结果：ChannelFuture
->     final ChannelFuture regFuture = initAndRegister();
->     final Channel channel = regFuture.channel();
->     // cause()：返回IO操作失败的原因
->     if (regFuture.cause() != null) {
->         return regFuture;
->     }
->     // isDone()：返回任务是否已完成，任务可能正常结束、可能发生异常、也可能被取消
->     if (regFuture.isDone()) {
->         // 进入判断就肯定任务已经完成了
->         // 返回一个新的io.netty.channel.ChannelPromise，ChannelPromise是一种
->         // 可写的特殊的ChannelFuture
->         ChannelPromise promise = channel.newPromise();
->         // 调用doBind0()进行绑定，如果initAndRegister()执行成功(通过regFuture判断)，就
->         // 给channel绑定localAddress，并添加监听器ChannelFutureListener.CLOSE_ON_FAILURE
->         // 如果失败，就将原因写入到ChannelPromise中(ChannelPromise就是可写的ChannelFuture)
->         doBind0(regFuture, channel, localAddress, promise);
->         return promise;
->     } else {
->         // 注册的future几乎已经完成了,但以防万一
->         final PendingRegistrationPromise promise = new PendingRegistrationPromise(channel);
->         regFuture.addListener(new ChannelFutureListener() {
->             @Override
->             public void operationComplete(ChannelFuture future) throws Exception {
->                 Throwable cause = future.cause();
->                 if (cause != null) {
->                     // 在EventLoop中注册失败，因此在访问Channel的EventLoop时，
->                     // ChannelPromise不能直接导致IllegalStateException
->                     promise.setFailure(cause);
->                 } else {
->                     // 注册操作已完成, 所以设置正确的执行器去使用
->                     // See https://github.com/netty/netty/issues/2586
->                     promise.registered();
->                     doBind0(regFuture, channel, localAddress, promise);
->                 }
->             }
->         });
->         return promise;
->     }
+>  // 初始化并绑定channel，返回其异步执行的结果：ChannelFuture
+>  final ChannelFuture regFuture = initAndRegister();
+>  final Channel channel = regFuture.channel();
+>  // cause()：返回IO操作失败的原因
+>  if (regFuture.cause() != null) {
+>      return regFuture;
+>  }
+>  // isDone()：返回任务是否已完成，任务可能正常结束、可能发生异常、也可能被取消
+>  if (regFuture.isDone()) {
+>      // 进入判断就肯定任务已经完成了
+>      // 返回一个新的io.netty.channel.ChannelPromise，ChannelPromise是一种
+>      // 可写的特殊的ChannelFuture
+>      ChannelPromise promise = channel.newPromise();
+>      // 调用doBind0()进行绑定，如果initAndRegister()执行成功(通过regFuture判断)，就
+>      // 给channel绑定localAddress，并添加监听器ChannelFutureListener.CLOSE_ON_FAILURE
+>      // 如果失败，就将原因写入到ChannelPromise中(ChannelPromise就是可写的ChannelFuture)
+>      doBind0(regFuture, channel, localAddress, promise);
+>      return promise;
+>  } else {
+>      // 注册的future几乎已经完成了,但以防万一
+>      final PendingRegistrationPromise promise = new PendingRegistrationPromise(channel);
+>      regFuture.addListener(new ChannelFutureListener() {
+>          @Override
+>          public void operationComplete(ChannelFuture future) throws Exception {
+>              Throwable cause = future.cause();
+>              if (cause != null) {
+>                  // 在EventLoop中注册失败，因此在访问Channel的EventLoop时，
+>                  // ChannelPromise不能直接导致IllegalStateException
+>                  promise.setFailure(cause);
+>              } else {
+>                  // 注册操作已完成, 所以设置正确的执行器去使用
+>                  // See https://github.com/netty/netty/issues/2586
+>                  promise.registered();
+>                  doBind0(regFuture, channel, localAddress, promise);
+>              }
+>          }
+>      });
+>      return promise;
+>  }
 > }
 > 
 > 
 > final ChannelFuture initAndRegister() {
->     Channel channel = null;
->     try {
->         // 这里的channelFactory是io.netty.channel.ReflectiveChannelFactory类型
->         // 通过反射创建io.netty.channel.socket.nio.NioServerSocketChannel实例
->         channel = channelFactory.newChannel();
->         // 调用ServerBootStrap中的init()方法初始化channel：
->         // 	1. 给channel设置options，options为LinkedHashMap类型
->         //	2. 给channel设置attrs，attrs也是LinkedHashMap类型
->         //	3. 判断channel的pipeline中是否添加了handler，如果添加了就把handler添加到
->         //		管道的最后
->         // 	4. 往管道中添加一个ServerBootstrapAcceptor
->         init(channel);
->     } catch (Throwable t) {
->         if (channel != null) {
->             channel.unsafe().closeForcibly();
->         }
->         return new DefaultChannelPromise(channel, GlobalEventExecutor.INSTANCE).setFailure(t);
->     }
->     // config()：ServerBootstrapConfig
->     // group()：NioEventLoopGroup
->     // register()：将channel注册到NioEventLoopGroup中，注册完成时ChannelFuture收到通知
->     ChannelFuture regFuture = config().group().register(channel);
->     // cause()：返回IO操作失败的原因
->     if (regFuture.cause() != null) {
->         if (channel.isRegistered()) {
->             channel.close();
->         } else {
->             channel.unsafe().closeForcibly();
->         }
->     }
->     // 如果到这里，就说明操作成功了，就是以下情况之一：
->     // 1) 如果我们尝试从事件循环中注册，那么此时注册已经完成了，也就是说，现在调用bind()方法和
->     //		connect()方法时安全的，因为channel已经被注册了
->     // 2) 如果我们尝试从其他的线程中注册, 那么注册的请求已经成功添加到事件循环后续执行的任务队列中
->     //		也就是说调用bind()方法和connect()方法是安全的，因为bind()方法和connect()方法会在
->     //		已经计划的注册操作之后被执行，因为register()、bind()、connect()方法一定会在同一个
->     //		线程中
->     return regFuture;
+>  Channel channel = null;
+>  try {
+>      // 这里的channelFactory是io.netty.channel.ReflectiveChannelFactory类型
+>      // 通过反射创建io.netty.channel.socket.nio.NioServerSocketChannel实例
+>      channel = channelFactory.newChannel();
+>      // 调用ServerBootStrap中的init()方法初始化channel：
+>      // 	1. 给channel设置options，options为LinkedHashMap类型
+>      //	2. 给channel设置attrs，attrs也是LinkedHashMap类型
+>      //	3. 判断channel的pipeline中是否添加了handler，如果添加了就把handler添加到
+>      //		管道的最后
+>      // 	4. 往管道中添加一个ServerBootstrapAcceptor
+>      init(channel);
+>  } catch (Throwable t) {
+>      if (channel != null) {
+>          channel.unsafe().closeForcibly();
+>      }
+>      return new DefaultChannelPromise(channel, GlobalEventExecutor.INSTANCE).setFailure(t);
+>  }
+>  // config()：ServerBootstrapConfig
+>  // group()：NioEventLoopGroup
+>  // register()：将channel注册到NioEventLoopGroup中，注册完成时ChannelFuture收到通知
+>  ChannelFuture regFuture = config().group().register(channel);
+>  // cause()：返回IO操作失败的原因
+>  if (regFuture.cause() != null) {
+>      if (channel.isRegistered()) {
+>          channel.close();
+>      } else {
+>          channel.unsafe().closeForcibly();
+>      }
+>  }
+>  // 如果到这里，就说明操作成功了，就是以下情况之一：
+>  // 1) 如果我们尝试从事件循环中注册，那么此时注册已经完成了，也就是说，现在调用bind()方法和
+>  //		connect()方法时安全的，因为channel已经被注册了
+>  // 2) 如果我们尝试从其他的线程中注册, 那么注册的请求已经成功添加到事件循环后续执行的任务队列中
+>  //		也就是说调用bind()方法和connect()方法是安全的，因为bind()方法和connect()方法会在
+>  //		已经计划的注册操作之后被执行，因为register()、bind()、connect()方法一定会在同一个
+>  //		线程中
+>  return regFuture;
 > }
+> 
+> 
+> /**
+>  * ServerBootstrap中对init()方法的实现
+>  *
+>  * 当服务端创建一个Channel时，会同时创建一个ChannelPipeline对象，创建好后二者就建立关联关系，并且
+>  * 这种关联关系在channel整个生命周期中都不会发生改变
+>  *	
+>  * ChannelPipeline里面维护的是由双向链表构造的一个又一个的ChannelHandler，创建ChannelHandler
+>  * 同时又会创建ChannelHandlerContext对象，ChannelHandlerContext对象是联结ChannelHandler与
+>  * ChannelPipeline的桥梁和纽带，从根本上来说，ChannelPipeline中维护的实际上是一个又一个的
+>  * ChannelHandlerContext，ChannelHandlerContext里面可以引用到对应的ChannelHandler
+>  
+>  * ChannelHandler有分为两个方向，一个是Inbound(从外面进入到程序中)，一个是Outbound(程序把数据发
+>  * 出)。当数据从外界进来，netty会检查pipeline中的每个ChannelHandler，判断这个ChannelHandler
+>  * 是否是一个Inbound handler(用的instanceof判断)。通过这种方式将inbound与outbound分开
+>  *
+>  * servlet中的filter或者spring mvc中的interceptor都是既过滤/拦截进来的，也过滤/拦截出去的，但
+>  * netty中的handler是分开的。
+>  */
+> @Override
+> void init(Channel channel) throws Exception {
+>     // 获取ChannelOption，为channel设置option
+> 	final Map<ChannelOption<?>, Object> options = options0();
+> 	synchronized (options) {
+> 		setChannelOptions(channel, options, logger);
+> 	}
+> 
+>     // 获取attr属性，这里的attr是Channel和ChannelHandlerContext共享的
+>     // https://netty.io/wiki/new-and-noteworthy-in-4.1.html#wiki-h3-3
+> 	final Map<AttributeKey<?>, Object> attrs = attrs0();
+> 	synchronized (attrs) {
+> 	for (Entry<AttributeKey<?>, Object> e: attrs.entrySet()) {
+> 		@SuppressWarnings("unchecked")
+> 		AttributeKey<Object> key = (AttributeKey<Object>) e.getKey();
+> 			channel.attr(key).set(e.getValue());
+> 		}
+> 	}
+> 	
+> 	ChannelPipeline p = channel.pipeline();
+> 
+> 	final EventLoopGroup currentChildGroup = childGroup;
+> 	final ChannelHandler currentChildHandler = childHandler;
+> 	final Entry<ChannelOption<?>, Object>[] currentChildOptions;
+> 	final Entry<AttributeKey<?>, Object>[] currentChildAttrs;
+> 	synchronized (childOptions) {
+> 		currentChildOptions = childOptions.entrySet().toArray(newOptionArray(childOptions.size()));
+> 	}
+> 	synchronized (childAttrs) {
+> 		currentChildAttrs = childAttrs.entrySet().toArray(newAttrArray(childAttrs.size()));
+> 	}
+> 
+>     // 将一个ChannelInitializer添加到pipeline中，而ChannelInitializer是一个
+>     // ChannelInboundHandlerAdapter，可以在它的initChannel()里面添加任意多个handler
+> 	p.addLast(new ChannelInitializer<Channel>() {
+> 		@Override
+> 		public void initChannel(final Channel ch) throws Exception {
+> 			final ChannelPipeline pipeline = ch.pipeline();
+> 			ChannelHandler handler = config.handler();
+> 			if (handler != null) {
+> 				pipeline.addLast(handler);
+> 			}
+> 
+>             // 执行一个acceptor，将bossGroup工作转移给workerGroup
+> 			ch.eventLoop().execute(new Runnable() {
+> 				@Override
+> 				public void run() {
+> 					pipeline.addLast(new ServerBootstrapAcceptor(
+> 					ch, currentChildGroup, currentChildHandler, currentChildOptions, currentChildAttrs));
+> 				}
+> 			});
+> 		}
+> 	});
+> }
+> 
+> 
+> 
 > ```
 
 #### `io.netty.channel.ChannelFuture`
