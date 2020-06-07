@@ -470,6 +470,27 @@
 
   2. 借助`Netty`提供的向`ChannelPipeline`添加`ChannelHandler`时调用的`addLast()`方法来传递`EventExecutor`
 
+     说明：
+
+     默认情况下（即调用`addLast(ChannelHandler... handlers)`），`ChannelHandler`中的回调方法都是由`IO`线程所执行；
+
+     如果调用了`addLast(EventExecutorGroup group,ChannelHandler... handlers)`方法，那么`ChannelHandler`中的回调方法由参数中的`group`线程组来执行。
+
+     ```java
+     @Override
+     protected void initChannel(SocketChannel ch) throws Exception {
+         ChannelPipeline pipeline = ch.pipeline();
+         pipeline.addLast();
+     }
+     ```
+
+- `JDK`所提供的`Future`只能通过手工方式检查执行结果，而这个操作是会阻塞的；`Netty`则对`ChannelFuture`进行了增强，通过`ChannelFutureListener`以回调的方式来获取执行结果，去除了手工检查阻塞的操作；值得注意的是：`ChannelFutureListener`的`operationComplete`方法是由`IO`线程执行的，因此不再在这里执行耗时的操作，否则需要通过另外的线程或线程池来执行。
+
+- 在`Netty`中有两种消息发送的方式，可以直接写到`Channel`中，也可以写到`ChannelHandler`所关联的那个`ChannelHandlerContext`中（即`ChannelHandlerContext.channel().writeAndFlush()`和`ChannelHandlerContext.writeAndFlush()`两种方式），对于前一种方式来说，消息会从`ChannelPipeline`的末尾`ChannelHandler`开始流动，对于后一种方式来说，消息会从`ChannelPipeline`中的下一个`ChannelHandler`开始流动。由此：
+
+  - `ChannelHandlerContext`与`ChannelHander`之间的关联绑定关系是永远不会发生改变的，因此对其进行缓存是没有任何问题的
+  - 对于`Channel`的同名方法来说，`ChannelHandlerContext`的方法将会产生更短的事件流，所以我们应该在可能的情况下利用这个特性来提升应用性能。
+
 #### `io.netty.util.concurrent.EventExecutorGroup`
 
 > `EventExecutorGroup`通过它的`next()`方法提供`io.netty.util.concurrent.EventExecutor`进行使用，除此之外，还负责它们的生命周期以及对它们以全局的方式进行关闭
