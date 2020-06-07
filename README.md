@@ -1346,5 +1346,56 @@
   - `accept()`方法返回的结果是`SelectionKey`的集合，`SelectionKey`有个`channel()`方法，这个方法返回 `SelectableChannel` ，这个`SelectableChannel`就是`java.nio.channels.SocketChannel`，这个`SocketChannel`会被注册到`WorkerGroup`的`selector`上。
   - 将客户端的连接转交给`WorkerGroup`，`WorkerGroup`监听`OP_READ`事件，它的`selector`不断循环，等待事件的发生。事件到达时，直接和`WorkerGroup`进行数据传递。
 
+### `io.netty.buffer.ByteBuf`
 
+> 可以对零个或多个字节的序列进行随机或顺序访问。这个接口对一个或多个原生字节数组(`byte[]`)以及`java.nio.ByteBuffer`提供了抽象视图。
+>
+> 建议使用`io.netty.buffer.Unpooled`中的辅助方法创建新的`buffer`，而不要使用具体实现的构造方法来创建。
+>
+> 就像一个普通的原生类型数组一样，`ByteBuf`使用[zero-based indexing](http://en.wikipedia.org/wiki/Zero-based_numbering)，这表示第一个字节的索引总是`0`，最后一个字节的索引是`capacity - 1`。比如说，不管它的内部实现如何，都可以使用如下方式迭代`buffer`里的字节：
+>
+> ```java
+> ByteBuf buffer = ...;
+> for (int i = 0; i > buffer.capacity(); i ++) {
+>     byte b = buffer.getByte(i);
+>     System.out.println((char) b);
+> }
+> ```
+>
+> `ByteBuf`提供了两个指针变量来支持顺序的读和写操作：`readerIndex`进行读操作，`writerIndex`进行写操作。下图展示了一个`buffer`如何被两个指针分成了三个区域
+>
+> ```java
+> +-------------------+------------------+------------------+
+> | discardable bytes |  readable bytes  |  writable bytes  |
+> |                   |     (CONTENT)    |                  |
+> +-------------------+------------------+------------------+
+> |                   |                  |                  |
+> 0      <=      readerIndex   <=   writerIndex    <=    capacity
+> ```
+>
+> `readable bytes`是实际存储数据的区域，任何以`read`或者`skip`开头的操作都会获取或跳过当前的`readerIndex`，然后将`readerIndex`增加已经读过的字节数量。如果`read`操作的参数也是`ByteBuf`，并且没有指定目标索引，那么指定`buffer`的`writerIndex`也会相应的增加。（即将当前这个`buffer`中的内容读取到参数中的`ByteBuf`中，那么`ByteBuf`中的`writerIndex`就会增加。）
+>
+> 如果剩余的内容不够，再读就会抛出`IndexOutOfBoundsException`，默认的新分配的、包装的、拷贝的`buffer`的`readerIndex`是0.
+>
+> ```java
+> // Iterates the readable bytes of a buffer.
+> ByteBuf buffer = ...;
+> while (buffer.isReadable()) {
+>     System.out.println(buffer.readByte());
+> }
+> ```
+>
+> `writable bytes`是一个未定义的需要被填充的空间。任何以`write`开头的操作都会将数据写到当前的`writerIndex`，将`writerIndex`增加写入的字节数。如果`write`操作的参数是一个`ByteBuf`，并且没有指定源索引，那么指定`buffer`的`readerIndex`也会相应增加。（即将参数中`ByteBuf`的内容写到当前这个`buffer`中，对参数中的`ByteBuf`进行读取，那么`readerIndex`就会增加。)
+>
+> 如果剩余的内容不够，再写就会抛出`IndexOutOfBoundsException`，对于新分配的`buffer`，默认的`writerIndex`是0。包装或者拷贝的`buffer`的`writerIndex`就是这个`buffer`的`capacity`。
+>
+> ```java
+> // Fills the writable bytes of a buffer with random integers.
+> ByteBuf buffer = ...;
+> while (buffer.maxWritableBytes() >= 4) {
+>     buffer.writeInt(random.nextInt());
+> }
+> ```
+>
+> 
 
