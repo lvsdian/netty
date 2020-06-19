@@ -1357,8 +1357,8 @@
 > ```java
 > ByteBuf buffer = ...;
 > for (int i = 0; i > buffer.capacity(); i ++) {
->     byte b = buffer.getByte(i);
->     System.out.println((char) b);
+>  byte b = buffer.getByte(i);
+>  System.out.println((char) b);
 > }
 > ```
 >
@@ -1373,7 +1373,9 @@
 > 0      <=      readerIndex   <=   writerIndex    <=    capacity
 > ```
 >
-> `readable bytes`是实际存储数据的区域，任何以`read`或者`skip`开头的操作都会获取或跳过当前的`readerIndex`，然后将`readerIndex`增加已经读过的字节数量。如果`read`操作的参数也是`ByteBuf`，并且没有指定目标索引，那么指定`buffer`的`writerIndex`也会相应的增加。（即将当前这个`buffer`中的内容读取到参数中的`ByteBuf`中，那么`ByteBuf`中的`writerIndex`就会增加。）
+> `discardable bytes`区域内容是已读过的内容，所以是“可丢弃的字节”
+>
+> `readable bytes`是实际存储数据的区域，任何以`read`或者`skip`开头的操作都会获取或跳过当前的`readerIndex`，然后将`readerIndex`增加已经读过的字节数量。如果`read`操作的参数也是`ByteBuf`，并且没有指定目标索引，那么指定`buffer`的`writerIndex`也会相应的增加。（即将当前这个`buffer`中的内容读取到参数中的`ByteBuf`中，那么参数`ByteBuf`中的`writerIndex`就会增加。）
 >
 > 如果剩余的内容不够，再读就会抛出`IndexOutOfBoundsException`，默认的新分配的、包装的、拷贝的`buffer`的`readerIndex`是0.
 >
@@ -1381,7 +1383,7 @@
 > // Iterates the readable bytes of a buffer.
 > ByteBuf buffer = ...;
 > while (buffer.isReadable()) {
->     System.out.println(buffer.readByte());
+> 	System.out.println(buffer.readByte());
 > }
 > ```
 >
@@ -1393,9 +1395,79 @@
 > // Fills the writable bytes of a buffer with random integers.
 > ByteBuf buffer = ...;
 > while (buffer.maxWritableBytes() >= 4) {
->     buffer.writeInt(random.nextInt());
+> 	buffer.writeInt(random.nextInt());
 > }
 > ```
+>
+> `discardable bytes`这部分内容包含已经被读操作读取过的字节，初始时，这部分内容长度是`0`，随着读操作的执行，它的长度一直增加到`writeIndex`。被读取过的字节可通过调用`discardReadBytes()`方法被丢弃掉以回收未使用的空间，如下图所示：
+>
+> ```java
+> BEFORE discardReadBytes()
+>     +-------------------+------------------+------------------+
+>     | discardable bytes |  readable bytes  |  writable bytes  |
+>     +-------------------+------------------+------------------+
+>     |                   |                  |                  |
+>     0      <=      readerIndex   <=   writerIndex    <=    capacity
+> 
+>     
+>  AFTER discardReadBytes()
+>      +------------------+--------------------------------------+
+>      |  readable bytes  |    writable bytes (got more space)   |
+>      +------------------+--------------------------------------+
+>      |                  |                                      |
+> readerIndex (0) <= writerIndex (decreased)        <=        capacity
+> ```
+>
+> 请注意，在调用`discardReadBytes()`后没有任何保证`writable bytes`部分的内容，大多数情况下`writable bytes`不会移动，甚至被填充不同的数据，取决于底层`buffer`的实现。
+>
+> 你可以通过调用`clear()`将`readerIndex`和`writerIndex`设置为`0`，但它并不会清空`buffer`的内容（比如用`0`填充），只是清空两个指针，这个操作的语义与`ByteBuffer.clear()`也不一样。
+>
+> ```java
+> BEFORE clear()
+>     +-------------------+------------------+------------------+
+>     | discardable bytes |  readable bytes  |  writable bytes  |
+>     +-------------------+------------------+------------------+
+>     |                   |                  |                  |
+>     0      <=      readerIndex   <=   writerIndex    <=    capacity
+>     
+> AFTER clear()
+>     +---------------------------------------------------------+
+>     |             writable bytes (got more space)             |
+>     +---------------------------------------------------------+
+>     |                                                         |
+>     0 = readerIndex = writerIndex            <=            capacity
+> ```
+>
+> 对于一个简单的单字节搜索，可以使用`indexOf(int, int, byte)`或者`bytesBefore(int, int, byte)`，当你需要处理一个以`NULL`结尾的字符串时`bytesBefore(byte)`特别有用，对于完整的搜索，可以用`ByteProcessor`中`forEachByte(int, int, ByteProcessor)`方法
+>
+> 在每个`buffer`中有两个标志索引，一个存储`readerIndex`，另一个存储`writerIndex`。你总是可以通过调用重置方法重新定位这两个索引中的一个。
+>
+> 你可以通过调用以下方法创建一个既有`buffer`的视图：
+>
+> ```java
+> duplicate()
+> slice()
+> slice(int, int)
+> readSlice(int)
+> retainedDuplicate()
+> retainedSlice()
+> retainedSlice(int, int)
+> readRetainedSlice(int)
+> ```
+>
+> 衍生的`buffer`会有一个自己独有的`readerIndex`，`writeIndex`和标志索引。但他们会共享底层的数据。就像一个`NIO` `buffer`。
+>
+> 如果需要进行一个完全的拷贝，就用`copy()`方法
+>
+> 转换成`byte array`。如果一个`ByteBuf`是通过字节数组来维护，那么就可以通过`array()`方法访问它，要想确定一个`buffer`是否由一个数组来维护，就可以调用`harArray()`。
+>
+> 转换成`Nio Buffer`。如果一个`ByteBuf`能被转换成`NIO` `ByteBuffer`，并且共享它的内容，就可以通过调用`nioBuffer()`方法，通过`nioBufferCount()`方法确定它是否可以被转为`NIO` `buffer`。
+>
+> 转换为字符串。提供了各种各样的`toString(Charset)`方法将一个`ByteBuf`转为`String`，请注意`toString()`不是一个转换的方法。
+>
+> 
+>
+> 
 >
 > 
 
