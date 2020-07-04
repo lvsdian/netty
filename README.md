@@ -1463,11 +1463,51 @@
 >
 > 转换成`Nio Buffer`。如果一个`ByteBuf`能被转换成`NIO` `ByteBuffer`，并且共享它的内容，就可以通过调用`nioBuffer()`方法，通过`nioBufferCount()`方法确定它是否可以被转为`NIO` `buffer`。
 >
-> 转换为字符串。提供了各种各样的`toString(Charset)`方法将一个`ByteBuf`转为`String`，请注意`toString()`不是一个转换的方法。
+> 转换为字符串。提供了各种各样的`toString(Charset)`方法将一个`ByteBuf`转为`String`，请注意`toString()`不是一个转换的方法
+
+- `Netty`中的`ByteBuf`提供的3种缓冲区类型：
+  - `heap buffer`：`jvm`堆上分配的缓冲区，通过一个`byte array`来维护
+    - 优点：由于数据是存储在`JVM`的堆中，因此可以快速创建快速释放，并且它提供了直接访问内部字节数组的方法
+    - 缺点：每次读写数据时，都需要先将数据复制到直接缓冲区再进行网络传输
+  - `direct buffer` ：在操作系统的内存上所分配的空间，由`jvm`上的一个引用来指向它，不会占用堆的容量空间
+    - 优点：在使用`socket`进行数据传输时，性能非常好，因为数据直接位于操作系统的本地内存中，所以不需要从`JVM`将数据复制到直接缓冲区中，性能很好
+    - 缺点：因为`direct buffer`是直接在操作系统内存中的，所以内存空间的分配与释放要比堆空间更加复杂，速度慢一些。
+    - `Netty`通过提供内存池来解决这个问题。直接缓冲区并不支持通过字节数组的方式来访问数据
+    - 对于后端业务来说，推荐使用`HeapByteBuf`，对于`IO`线程在读写缓冲区时，推荐使用`DirectByteBuf`
+  - `composite buffer`：复合缓冲区（`NIO`所没有提供的），里面可以存放其他缓冲区
+- `JDK`的`ByteBuffer`与`netty`的`ByteBuf`之间的差异
+  - `Netty`的`ByteBuf`采用了读写分离的策略（`readerIndex`与`writerIndex`）,一个初始化（里面尚未有任何数据）的`ByteBuf`的`readerIndex`与`writerIndex`值都为0
+  - 当读索引与写索引处于同一个位置时，如果我们继续读取，那么就会抛出`IndexOutofBoundsException`
+  - 对于`ByteBuf`的任何读写操作都会分别单独维护读索引与写索引，`maxCapacity`最大容量默认的限制就是`Integer.MAX_VALUE`
+- `JDK`的`ByteBuffer`缺点：
+  - `final byte[] hb`：这是`JDK`的`ByteBuffer`对象中用于存储数据的对象声明，可以看到，其字节数组是被声明为`final`的，也就是长度是固定不变的，一旦分配好后，不能动态扩容与收缩，而且当待存储的数据字节很大时，可能出现`IndexOutofBoundsException`。如果要预防这个异常，就需要在存储之前完全确定好待存储的字节大小。如果`ByteBuffer`的空间不足，只有一种解决方案：创建一个全新的`ByteBuffer`对象，然后再将之前的数据复制过去，这一切操作都需要由开发者自己来手动完成
+  - `ByteBuffer`只使用一个`position`指针来标识位置信息，在进行读写切换时，就需要调用`flip`方法或者是`rewind`方法，使用起来很不方便
+- `Netty`的`ByteBuf`的优点：
+  - 存储字节的数组是动态的，其最大值默认是`Integer.MAX_VALUE`，这里的动态性体现在`write`方法中，`write`方法在执行时会判断`buffer`容量，如果不足则自动扩容
+  -  `ByteBuf`的读写索引是完全分开的，使用起来很方便
+
+### `io.netty.util.ReferenceCounted`
+
+[reference-counted](https://netty.io/wiki/reference-counted-objects.html)
+
+> 一个`reference-counted`对象需要显式的进行回收
 >
-> 
+> 当一个新的`ReferenceCounted`对象实例化时，它的引用计数值就是1。调用`retain()`方法会使引用计数加1，调用`release()`方法会使引用计数减1。如果引用计数减小到0，那么该对象就会被显式回收，访问一个被回收的对象会导致访问违例
 >
-> 
->
-> 
+> 如果一个实现了`ReferenceCounted`的对象是其他实现了`ReferenceCounted`对象的容器，那么当这个容器的引用计数变为0时，它里面的对象也会通过`release()`方法被释放。
+
+### 处理器
+
+- `Netty`中的处理器可以分为两类：入栈处理器和出栈处理器
+- 入栈处理器的顶层是`ChannelInboundHandler`，出栈处理器的顶层是`ChannelOutboundHandler`。
+- 数据处理时常用的各种编解码器本质上都是处理器
+- 编解码器：无论我们向网络中写入的数据是什么类型（`int`、`char`、`String`、二进制），数据在网络中传输时，都是以字节流的形式呈现的，将数据有原本的形式转换为字节流的操作称为编码(`encode`)，将数据由字节转换为它原本的格式或是其他格式的操作称为解码(`decode`)，编解码统一称为`codec`
+- 编码：本质上是一种出栈处理器，因此编码一定是一种`ChannelOutboundHandler`
+- 解码：本质上是一种入栈处理器，因此解码一定是一种`ChannelInboundHandler`
+- 在`netty`中，编码器通常以`XXXEncoder`命名，解码器通常以`XXXDecoder`命令
+
+### 编解码器
+
+- 无论是编码器还是解码器，其所接收的消息类型必须要与待处理的参数类型一致，否则该编码器或解码器就不会被执行
+- 在解码器进行数据解码时，一定要记得判断缓冲（`ByteBuf`）中的数据是否足够，否则产生问题。
 
